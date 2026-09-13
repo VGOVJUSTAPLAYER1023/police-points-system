@@ -1,73 +1,115 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
-    <title>{% block title %}Philippine Pampanga Roleplay{% endblock %}</title>
+<title>{% block title %}Philippine Pampanga Roleplay{% endblock %}</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
 
 <header class="nav">
 
-    <a class="brand" href="{{ url_for('public_home') }}">
+  <a class="brand" href="{{ url_for('public_home') }}">
+    <img
+      src="{{ url_for('static', filename='Gemini_Generated_Image_1xzmsj1xzmsj1xzm-removebg-preview.png') }}"
+      alt="Logo"
+      class="brand-logo"
+    >
 
-        <!-- Logo -->
-        <img
-            src="{{ url_for('static', filename='Gemini_Generated_Image_1xzmsj1xzmsj1xzm-removebg-preview.png') }}"
-            alt="Philippine Pampanga Roleplay Logo"
-            class="brand-logo"
-        >
+    <div class="brand-text">
+      <div class="brand-title">Philippine Pampanga Roleplay</div>
+      <div class="brand-subtitle">Philippine National Police</div>
+    </div>
+  </a>
 
-        <!-- Website Title -->
-        <div class="brand-text">
-            <div class="brand-title">Philippine Pampanga Roleplay</div>
-            <div class="brand-subtitle">Philippine National Police</div>
-        </div>
+  <nav class="nav-links">
+    <a href="{{ url_for('public_home') }}">Public Search</a>
 
-    </a>
+    {% if current_role == 'admin' %}
+      <a href="{{ url_for('admin_home') }}">Admin</a>
+    {% endif %}
 
-    <nav>
-        <a href="{{ url_for('public_home') }}">Public Search</a>
+    {% if current_role in ['admin','moderator'] %}
+      <a href="{{ url_for('mod_home') }}">Moderator</a>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    {% endif %}
 
-        {% if current_role == 'admin' %}
-            <a href="{{ url_for('admin_home') }}">Admin</a>
-        {% endif %}
+    <!-- DARK MODE BUTTON -->
+    <button
+      id="themeToggle"
+      class="theme-toggle"
+      type="button"
+      aria-label="Toggle dark mode"
+    >
+      🌙 Dark Mode
+    </button>
 
-        {% if current_role in ['admin', 'moderator'] %}
-            <a href="{{ url_for('mod_home') }}">Moderator</a>
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% endif %}
-    </nav>
+  </nav>
 
 </header>
 
-
 <main class="wrap">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="flash {{ category }}">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endwith %}
 
-        {% for category, message in messages %}
-
-            <div class="flash {{ category }}">
-                {{ message }}
-            </div>
-
-        {% endfor %}
-
-    {% endwith %}
-
-    {% block content %}{% endblock %}
+{% block content %}{% endblock %}
 
 </main>
 
-
 <footer>
-    Philippine Pampanga Roleplay · Philippine National Police
+  Philippine Pampanga Roleplay · Philippine National Police
 </footer>
+
+
+<script>
+(function () {
+
+  const body = document.body;
+  const button = document.getElementById("themeToggle");
+
+  // Load saved theme
+  const savedTheme = localStorage.getItem("theme");
+
+  if (savedTheme === "dark") {
+    body.classList.add("dark-mode");
+  }
+
+  function updateButton() {
+    if (body.classList.contains("dark-mode")) {
+      button.textContent = "☀️ Light Mode";
+    } else {
+      button.textContent = "🌙 Dark Mode";
+    }
+  }
+
+  updateButton();
+
+  button.addEventListener("click", function () {
+
+    body.classList.toggle("dark-mode");
+
+    if (body.classList.contains("dark-mode")) {
+      localStorage.setItem("theme", "dark");
+    } else {
+      localStorage.setItem("theme", "light");
+    }
+
+    updateButton();
+
+  });
+
+})();
+</script>
 
 </body>
 </html>

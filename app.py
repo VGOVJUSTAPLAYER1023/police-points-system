@@ -18,6 +18,7 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from PIL import Image
 
+# PostgreSQL
 try:
     import psycopg
     HAS_PSYCOPG = True
@@ -26,20 +27,27 @@ except ImportError:
 
 
 # =========================================================
-# APP CONFIG
+# APP
 # =========================================================
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "change-this-secret-key"
+)
 
-MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    ""
+).strip()
+
+MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024
 PERSONNEL_PER_PAGE = 15
 
 
 # =========================================================
-# ROLES / RANKS / STATUS / DEPARTMENTS
+# ROLES
 # =========================================================
 
 ROLES = [
@@ -58,6 +66,11 @@ ROLES = [
     "Other",
 ]
 
+
+# =========================================================
+# RANKS
+# =========================================================
+
 RANKS = [
     "Police Officer",
     "Corporal",
@@ -69,6 +82,11 @@ RANKS = [
     "Chief of Police",
 ]
 
+
+# =========================================================
+# STATUSES
+# =========================================================
+
 STATUSES = [
     "Active",
     "LOA",
@@ -77,6 +95,11 @@ STATUSES = [
     "Retired",
     "Training",
 ]
+
+
+# =========================================================
+# DEPARTMENTS
+# =========================================================
 
 DEPARTMENTS = [
     "Pampanga Police Office",
@@ -98,55 +121,86 @@ DEPARTMENTS = [
 
 
 # =========================================================
-# DATABASE
+# DATABASE CONNECTION
 # =========================================================
 
 def use_postgres():
-    return bool(DATABASE_URL and HAS_PSYCOPG)
+    return bool(
+        DATABASE_URL
+        and HAS_PSYCOPG
+    )
 
 
 def db():
+    """
+    Use PostgreSQL on Render.
+    Use SQLite when running locally.
+    """
+
     if use_postgres():
-        conn = psycopg.connect(DATABASE_URL)
-        conn.row_factory = psycopg.rows.dict_row
-        return conn
 
-    conn = sqlite3.connect(
-        os.path.join(os.path.dirname(__file__), "police.db")
+        connection = psycopg.connect(
+            DATABASE_URL
+        )
+
+        connection.row_factory = (
+            psycopg.rows.dict_row
+        )
+
+        return connection
+
+    connection = sqlite3.connect(
+        os.path.join(
+            os.path.dirname(__file__),
+            "police.db"
+        )
     )
-    conn.row_factory = sqlite3.Row
-    return conn
+
+    connection.row_factory = sqlite3.Row
+
+    return connection
 
 
-def qmark(sql):
+def sql(sql_text):
     """
-    Convert SQLite-style ? placeholders to PostgreSQL %s.
+    Convert SQLite ? placeholders
+    into PostgreSQL %s placeholders.
     """
-    return sql.replace("?", "%s") if use_postgres() else sql
+
+    if use_postgres():
+        return sql_text.replace(
+            "?",
+            "%s"
+        )
+
+    return sql_text
 
 
 # =========================================================
-# DATABASE INITIALIZATION / MIGRATION
+# DATABASE SETUP
 # =========================================================
 
 def init_db():
-    conn = db()
+
+    connection = db()
+
+    # -----------------------------------------------------
+    # PostgreSQL
+    # -----------------------------------------------------
 
     if use_postgres():
 
-        # USERS
-        conn.execute("""
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'viewer',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         """)
 
-        # PERSONNEL
-        conn.execute("""
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS personnel (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -160,39 +214,10 @@ def init_db():
                 profile_image BYTEA,
                 profile_image_mime TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         """)
 
-        # Upgrade existing v1/v2 database
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS role TEXT "
-            "DEFAULT 'PNP — Philippine National Police'"
-        )
-
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS department TEXT "
-            "DEFAULT 'Pampanga Police Office'"
-        )
-
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS status TEXT "
-            "DEFAULT 'Active'"
-        )
-
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS profile_token TEXT"
-        )
-
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS profile_image BYTEA"
-        )
-
-        conn.execute(
-            "ALTER TABLE personnel ADD COLUMN IF NOT EXISTS profile_image_mime TEXT"
-        )
-
-        # POINT LOG
-        conn.execute("""
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS point_log (
                 id SERIAL PRIMARY KEY,
                 personnel_id INTEGER NOT NULL
@@ -202,11 +227,10 @@ def init_db():
                 reason TEXT NOT NULL,
                 changed_by TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         """)
 
-        # CRIMINAL RECORDS
-        conn.execute("""
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS criminal_records (
                 id SERIAL PRIMARY KEY,
                 personnel_id INTEGER NOT NULL
@@ -219,29 +243,87 @@ def init_db():
                 case_date TEXT DEFAULT '',
                 created_by TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         """)
 
-        # Give existing personnel a unique profile token
-        rows = conn.execute(
-            "SELECT id FROM personnel WHERE profile_token IS NULL"
+        # -------------------------------------------------
+        # Upgrade older database
+        # -------------------------------------------------
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS role TEXT
+            DEFAULT 'PNP — Philippine National Police'
+        """)
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS department TEXT
+            DEFAULT 'Pampanga Police Office'
+        """)
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS status TEXT
+            DEFAULT 'Active'
+        """)
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS profile_token TEXT
+        """)
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS profile_image BYTEA
+        """)
+
+        connection.execute("""
+            ALTER TABLE personnel
+            ADD COLUMN IF NOT EXISTS profile_image_mime TEXT
+        """)
+
+        # -------------------------------------------------
+        # Give older personnel profile tokens
+        # -------------------------------------------------
+
+        old_people = connection.execute(
+            """
+            SELECT id
+            FROM personnel
+            WHERE profile_token IS NULL
+            """
         ).fetchall()
 
-        for row in rows:
-            conn.execute(
-                "UPDATE personnel SET profile_token = %s WHERE id = %s",
-                (secrets.token_urlsafe(24), row["id"])
+        for person in old_people:
+
+            token = secrets.token_urlsafe(32)
+
+            connection.execute(
+                """
+                UPDATE personnel
+                SET profile_token = %s
+                WHERE id = %s
+                """,
+                (
+                    token,
+                    person["id"],
+                )
             )
 
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS personnel_profile_token_idx
+        connection.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            personnel_profile_token_index
             ON personnel(profile_token)
         """)
 
+    # -----------------------------------------------------
+    # SQLite
+    # -----------------------------------------------------
+
     else:
 
-        # USERS
-        conn.executescript("""
+        connection.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -293,10 +375,13 @@ def init_db():
             );
         """)
 
-        # Upgrade old SQLite personnel table
+        # -------------------------------------------------
+        # Upgrade older SQLite database
+        # -------------------------------------------------
+
         columns = {
             row["name"]
-            for row in conn.execute(
+            for row in connection.execute(
                 "PRAGMA table_info(personnel)"
             ).fetchall()
         }
@@ -329,89 +414,140 @@ def init_db():
         ]
 
         for column, definition in migrations:
+
             if column not in columns:
-                conn.execute(
-                    f"ALTER TABLE personnel ADD COLUMN {column} {definition}"
+
+                connection.execute(
+                    f"""
+                    ALTER TABLE personnel
+                    ADD COLUMN {column}
+                    {definition}
+                    """
                 )
 
-        rows = conn.execute(
-            "SELECT id FROM personnel WHERE profile_token IS NULL"
+        old_people = connection.execute(
+            """
+            SELECT id
+            FROM personnel
+            WHERE profile_token IS NULL
+            """
         ).fetchall()
 
-        for row in rows:
-            conn.execute(
-                "UPDATE personnel SET profile_token = ? WHERE id = ?",
-                (secrets.token_urlsafe(24), row["id"])
+        for person in old_people:
+
+            token = secrets.token_urlsafe(32)
+
+            connection.execute(
+                """
+                UPDATE personnel
+                SET profile_token = ?
+                WHERE id = ?
+                """,
+                (
+                    token,
+                    person["id"],
+                )
             )
 
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS personnel_profile_token_idx
+        connection.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            personnel_profile_token_index
             ON personnel(profile_token)
         """)
 
+    # =====================================================
     # DEFAULT ADMIN
-    existing_admin = conn.execute(
-        qmark("SELECT 1 FROM users WHERE username = ?"),
-        ("admin",)
+    # =====================================================
+
+    existing_admin = connection.execute(
+        sql(
+            """
+            SELECT 1
+            FROM users
+            WHERE username = ?
+            """
+        ),
+        ("admin",),
     ).fetchone()
 
     if not existing_admin:
-        conn.execute(
-            qmark("""
+
+        connection.execute(
+            sql(
+                """
                 INSERT INTO users
-                (username, password_hash, role)
+                (
+                    username,
+                    password_hash,
+                    role
+                )
                 VALUES (?, ?, ?)
-            """),
+                """
+            ),
             (
                 "admin",
-                generate_password_hash("ChangeMe123!"),
+                generate_password_hash(
+                    "ChangeMe123!"
+                ),
                 "admin",
-            )
+            ),
         )
 
+    # =====================================================
     # SAMPLE DATA ONLY IF EMPTY
-    person_exists = conn.execute(
-        "SELECT 1 FROM personnel LIMIT 1"
+    # =====================================================
+
+    has_people = connection.execute(
+        """
+        SELECT 1
+        FROM personnel
+        LIMIT 1
+        """
     ).fetchone()
 
-    if not person_exists:
+    if not has_people:
 
         sample_people = [
+
             (
                 "Juan Dela Cruz",
                 "Police Officer",
                 25,
-                "Example record",
+                "Example personnel",
                 "PNP — Philippine National Police",
                 "Pampanga Police Office",
                 "Active",
-                secrets.token_urlsafe(24),
+                secrets.token_urlsafe(32),
             ),
+
             (
                 "Maria Santos",
                 "Sergeant",
                 60,
-                "Example record",
+                "Example personnel",
                 "PNP — Philippine National Police",
                 "Investigation Unit",
                 "Active",
-                secrets.token_urlsafe(24),
+                secrets.token_urlsafe(32),
             ),
+
             (
                 "Alex Reyes",
                 "Lieutenant",
                 95,
-                "Example record",
+                "Example personnel",
                 "Government",
                 "Administration",
                 "Active",
-                secrets.token_urlsafe(24),
+                secrets.token_urlsafe(32),
             ),
         ]
 
         for person in sample_people:
-            conn.execute(
-                qmark("""
+
+            connection.execute(
+                sql(
+                    """
                     INSERT INTO personnel
                     (
                         name,
@@ -424,12 +560,13 @@ def init_db():
                         profile_token
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """),
-                person
+                    """
+                ),
+                person,
             )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
 
 # =========================================================
@@ -437,10 +574,12 @@ def init_db():
 # =========================================================
 
 def login_required(function):
+
     @wraps(function)
-    def wrapped(*args, **kwargs):
+    def wrapper(*args, **kwargs):
 
         if not session.get("user_id"):
+
             return redirect(
                 url_for(
                     "mod_login",
@@ -448,18 +587,23 @@ def login_required(function):
                 )
             )
 
-        return function(*args, **kwargs)
+        return function(
+            *args,
+            **kwargs
+        )
 
-    return wrapped
+    return wrapper
 
 
-def role_required(*roles):
+def role_required(*allowed_roles):
+
     def decorator(function):
 
         @wraps(function)
-        def wrapped(*args, **kwargs):
+        def wrapper(*args, **kwargs):
 
             if not session.get("user_id"):
+
                 return redirect(
                     url_for(
                         "mod_login",
@@ -467,33 +611,48 @@ def role_required(*roles):
                     )
                 )
 
-            if session.get("role") not in roles:
+            if session.get("role") not in allowed_roles:
 
                 flash(
                     "You do not have permission to access this page.",
-                    "error"
+                    "error",
                 )
 
                 return redirect(
                     url_for("mod_home")
                 )
 
-            return function(*args, **kwargs)
+            return function(
+                *args,
+                **kwargs
+            )
 
-        return wrapped
+        return wrapper
 
     return decorator
 
 
 @app.context_processor
-def context():
+def inject_context():
+
     return {
-        "current_user": session.get("username"),
-        "current_role": session.get("role"),
-        "roles": ROLES,
-        "ranks": RANKS,
-        "statuses": STATUSES,
-        "departments": DEPARTMENTS,
+        "current_user":
+            session.get("username"),
+
+        "current_role":
+            session.get("role"),
+
+        "roles":
+            ROLES,
+
+        "ranks":
+            RANKS,
+
+        "statuses":
+            STATUSES,
+
+        "departments":
+            DEPARTMENTS,
     }
 
 
@@ -504,38 +663,65 @@ def context():
 @app.route("/")
 def public_home():
 
-    q = request.args.get("q", "").strip()
+    search = request.args.get(
+        "q",
+        ""
+    ).strip()
 
-    selected_role = request.args.get("role", "").strip()
+    selected_role = request.args.get(
+        "role",
+        ""
+    ).strip()
+
     selected_department = request.args.get(
-        "department", ""
+        "department",
+        ""
     ).strip()
+
     selected_rank = request.args.get(
-        "rank", ""
+        "rank",
+        ""
     ).strip()
+
     selected_status = request.args.get(
-        "status", ""
+        "status",
+        ""
     ).strip()
 
     try:
-        page = max(
-            1,
-            int(request.args.get("page", "1"))
+
+        page = int(
+            request.args.get(
+                "page",
+                "1"
+            )
         )
+
     except ValueError:
+
         page = 1
 
-    offset = (page - 1) * PERSONNEL_PER_PAGE
+    page = max(
+        page,
+        1
+    )
 
-    conn = db()
+    offset = (
+        page - 1
+    ) * PERSONNEL_PER_PAGE
+
+    connection = db()
 
     conditions = []
     params = []
 
+    # -----------------------------------------------------
     # CASE-INSENSITIVE SEARCH
-    if q:
+    # -----------------------------------------------------
 
-        search_value = f"%{q}%"
+    if search:
+
+        value = f"%{search}%"
 
         conditions.append("""
             (
@@ -546,40 +732,80 @@ def public_home():
             )
         """)
 
-        params.extend([
-            search_value,
-            search_value,
-            search_value,
-            search_value,
-        ])
+        params.extend(
+            [
+                value,
+                value,
+                value,
+                value,
+            ]
+        )
+
+    # -----------------------------------------------------
+    # FILTERS
+    # -----------------------------------------------------
 
     if selected_role:
-        conditions.append("role = ?")
-        params.append(selected_role)
+
+        conditions.append(
+            "role = ?"
+        )
+
+        params.append(
+            selected_role
+        )
 
     if selected_department:
-        conditions.append("department = ?")
-        params.append(selected_department)
+
+        conditions.append(
+            "department = ?"
+        )
+
+        params.append(
+            selected_department
+        )
 
     if selected_rank:
-        conditions.append("rank = ?")
-        params.append(selected_rank)
+
+        conditions.append(
+            "rank = ?"
+        )
+
+        params.append(
+            selected_rank
+        )
 
     if selected_status:
-        conditions.append("status = ?")
-        params.append(selected_status)
 
-    where_clause = ""
+        conditions.append(
+            "status = ?"
+        )
+
+        params.append(
+            selected_status
+        )
+
+    where = ""
 
     if conditions:
-        where_clause = "WHERE " + " AND ".join(conditions)
 
-    total_row = conn.execute(
-        qmark(
+        where = (
+            "WHERE "
+            + " AND ".join(
+                conditions
+            )
+        )
+
+    # -----------------------------------------------------
+    # TOTAL
+    # -----------------------------------------------------
+
+    total_row = connection.execute(
+        sql(
             f"""
             SELECT COUNT(*) AS total
             FROM personnel
-            {where_clause}
+            {where}
             """
         ),
         tuple(params),
@@ -587,8 +813,12 @@ def public_home():
 
     total = total_row["total"]
 
-    people = conn.execute(
-        qmark(
+    # -----------------------------------------------------
+    # PEOPLE
+    # -----------------------------------------------------
+
+    people = connection.execute(
+        sql(
             f"""
             SELECT
                 id,
@@ -599,50 +829,67 @@ def public_home():
                 department,
                 status
             FROM personnel
-            {where_clause}
-            ORDER BY name COLLATE NOCASE
+            {where}
+            ORDER BY LOWER(name)
             LIMIT ? OFFSET ?
             """
         ),
-        tuple(params) + (
+        tuple(params)
+        + (
             PERSONNEL_PER_PAGE,
             offset,
         ),
     ).fetchall()
 
-    conn.close()
+    connection.close()
 
     total_pages = max(
         1,
-        (total + PERSONNEL_PER_PAGE - 1)
+        (
+            total
+            + PERSONNEL_PER_PAGE
+            - 1
+        )
         // PERSONNEL_PER_PAGE
     )
 
     return render_template(
         "public.html",
+
         people=people,
-        q=q,
+
+        q=search,
+
         page=page,
-        total_pages=total_pages,
+
         total=total,
+
+        total_pages=total_pages,
+
         selected_role=selected_role,
+
         selected_department=selected_department,
+
         selected_rank=selected_rank,
+
         selected_status=selected_status,
     )
 
 
 # =========================================================
-# PUBLIC PROFILE
+# PUBLIC PERSONNEL PROFILE
 # =========================================================
 
-@app.route("/personnel/<int:person_id>")
+@app.route(
+    "/personnel/<int:person_id>"
+)
 def public_personnel(person_id):
 
-    conn = db()
+    connection = db()
 
-    person = conn.execute(
-        qmark("""
+    person = connection.execute(
+        sql(
+            """
             SELECT
                 id,
                 name,
@@ -654,16 +901,25 @@ def public_personnel(person_id):
                 status
             FROM personnel
             WHERE id = ?
-        """),
-        (person_id,),
+            """
+        ),
+        (
+            person_id,
+        ),
     ).fetchone()
 
     if not person:
-        conn.close()
-        return "Personnel record not found.", 404
 
-    criminal_records = conn.execute(
-        qmark("""
+        connection.close()
+
+        return (
+            "Personnel record not found.",
+            404,
+        )
+
+    criminal_records = connection.execute(
+        sql(
+            """
             SELECT
                 id,
                 case_number,
@@ -675,12 +931,15 @@ def public_personnel(person_id):
                 created_at
             FROM criminal_records
             WHERE personnel_id = ?
-            ORDER BY created_at DESC, id DESC
-        """),
-        (person_id,),
+            ORDER BY created_at DESC
+            """
+        ),
+        (
+            person_id,
+        ),
     ).fetchall()
 
-    conn.close()
+    connection.close()
 
     return render_template(
         "public_person.html",
@@ -690,226 +949,65 @@ def public_personnel(person_id):
 
 
 # =========================================================
-# PROFILE PICTURE
+# PROFILE IMAGE
 # =========================================================
 
-@app.route("/profile-image/<int:person_id>")
+@app.route(
+    "/profile-image/<int:person_id>"
+)
 def profile_image(person_id):
 
-    conn = db()
+    connection = db()
 
-    row = conn.execute(
-        qmark("""
+    image = connection.execute(
+        sql(
+            """
             SELECT
                 profile_image,
                 profile_image_mime
             FROM personnel
             WHERE id = ?
-        """),
-        (person_id,),
+            """
+        ),
+        (
+            person_id,
+        ),
     ).fetchone()
 
-    conn.close()
+    connection.close()
 
-    if not row or not row["profile_image"]:
+    if not image:
+
+        return "", 404
+
+    if not image["profile_image"]:
+
         return "", 404
 
     return send_file(
-        BytesIO(bytes(row["profile_image"])),
-        mimetype=row["profile_image_mime"] or "image/jpeg",
+        BytesIO(
+            bytes(
+                image["profile_image"]
+            )
+        ),
+        mimetype=(
+            image["profile_image_mime"]
+            or "image/jpeg"
+        ),
         max_age=300,
     )
 
 
-@app.post("/mod/personnel/<int:person_id>/profile")
-@role_required("admin", "moderator")
-def upload_profile_picture(person_id):
-
-    file = request.files.get("photo")
-
-    if not file or not file.filename:
-
-        flash(
-            "Please choose a profile picture.",
-            "error"
-        )
-
-        return redirect(
-            url_for("mod_home")
-        )
-
-    raw = file.read(
-        MAX_PROFILE_IMAGE_BYTES + 1
-    )
-
-    if len(raw) > MAX_PROFILE_IMAGE_BYTES:
-
-        flash(
-            "Profile picture must be 5 MB or smaller.",
-            "error"
-        )
-
-        return redirect(
-            url_for("mod_home")
-        )
-
-    try:
-
-        image = Image.open(
-            BytesIO(raw)
-        )
-
-        image.verify()
-
-        image = Image.open(
-            BytesIO(raw)
-        ).convert("RGB")
-
-    except Exception:
-
-        flash(
-            "Invalid image. Please upload JPG, PNG, or WebP.",
-            "error"
-        )
-
-        return redirect(
-            url_for("mod_home")
-        )
-
-    # Resize for database efficiency
-    image.thumbnail(
-        (700, 700),
-        Image.Resampling.LANCZOS
-    )
-
-    output = BytesIO()
-
-    image.save(
-        output,
-        format="JPEG",
-        quality=88,
-        optimize=True,
-    )
-
-    image_bytes = output.getvalue()
-
-    conn = db()
-
-    exists = conn.execute(
-        qmark(
-            "SELECT id FROM personnel WHERE id = ?"
-        ),
-        (person_id,),
-    ).fetchone()
-
-    if not exists:
-
-        conn.close()
-
-        flash(
-            "Personnel record not found.",
-            "error"
-        )
-
-        return redirect(
-            url_for("mod_home")
-        )
-
-    conn.execute(
-        qmark("""
-            UPDATE personnel
-            SET
-                profile_image = ?,
-                profile_image_mime = ?
-            WHERE id = ?
-        """),
-        (
-            image_bytes,
-            "image/jpeg",
-            person_id,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
-
-    flash(
-        "Profile picture updated.",
-        "success"
-    )
-
-    return redirect(
-        url_for("mod_home")
-    )
-
-
-@app.post("/mod/personnel/<int:person_id>/profile/remove")
-@role_required("admin", "moderator")
-def remove_profile_picture(person_id):
-
-    conn = db()
-
-    conn.execute(
-        qmark("""
-            UPDATE personnel
-            SET
-                profile_image = NULL,
-                profile_image_mime = NULL
-            WHERE id = ?
-        """),
-        (person_id,),
-    )
-
-    conn.commit()
-    conn.close()
-
-    flash(
-        "Profile picture removed.",
-        "success"
-    )
-
-    return redirect(
-        url_for("mod_home")
-    )
-
-
 # =========================================================
-# MODERATOR AREA
+# MODERATOR LOGIN
 # =========================================================
-
-@app.route("/mod")
-@login_required
-def mod_home():
-
-    conn = db()
-
-    people = conn.execute(
-        """
-        SELECT
-            id,
-            name,
-            rank,
-            points,
-            role,
-            department,
-            status,
-            profile_token
-        FROM personnel
-        ORDER BY name
-        """
-    ).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "mod.html",
-        people=people,
-    )
-
 
 @app.route(
     "/mod/login",
-    methods=["GET", "POST"]
+    methods=[
+        "GET",
+        "POST",
+    ],
 )
 def mod_login():
 
@@ -925,23 +1023,30 @@ def mod_login():
             ""
         )
 
-        conn = db()
+        connection = db()
 
-        user = conn.execute(
-            qmark("""
+        user = connection.execute(
+            sql(
+                """
                 SELECT *
                 FROM users
                 WHERE username = ?
-            """),
-            (username,),
+                """
+            ),
+            (
+                username,
+            ),
         ).fetchone()
 
-        conn.close()
+        connection.close()
 
         if (
             user
             and user["role"]
-            in ("admin", "moderator")
+            in (
+                "admin",
+                "moderator",
+            )
             and check_password_hash(
                 user["password_hash"],
                 password,
@@ -950,18 +1055,30 @@ def mod_login():
 
             session.clear()
 
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            session["role"] = user["role"]
+            session["user_id"] = (
+                user["id"]
+            )
+
+            session["username"] = (
+                user["username"]
+            )
+
+            session["role"] = (
+                user["role"]
+            )
 
             return redirect(
-                request.args.get("next")
-                or url_for("mod_home")
+                request.args.get(
+                    "next"
+                )
+                or url_for(
+                    "mod_home"
+                )
             )
 
         flash(
             "Invalid moderator credentials.",
-            "error"
+            "error",
         )
 
     return render_template(
@@ -972,169 +1089,35 @@ def mod_login():
 
 
 # =========================================================
-# ADMIN AREA
+# MODERATOR DASHBOARD
 # =========================================================
 
-@app.route("/admin")
-@role_required("admin")
-def admin_home():
+@app.route("/mod")
+@login_required
+def mod_home():
 
-    conn = db()
+    connection = db()
 
-    users = conn.execute(
-        """
-        SELECT
-            id,
-            username,
-            role,
-            created_at
-        FROM users
-        ORDER BY username
-        """
-    ).fetchall()
-
-    people = conn.execute(
+    people = connection.execute(
         """
         SELECT
             id,
             name,
             rank,
+            points,
             role,
             department,
             status
         FROM personnel
-        ORDER BY name
+        ORDER BY LOWER(name)
         """
     ).fetchall()
 
-    conn.close()
+    connection.close()
 
     return render_template(
-        "admin.html",
-        users=users,
+        "mod.html",
         people=people,
-    )
-
-
-@app.post("/admin/users/add")
-@role_required("admin")
-def add_user():
-
-    username = request.form.get(
-        "username",
-        ""
-    ).strip()
-
-    password = request.form.get(
-        "password",
-        ""
-    )
-
-    role = request.form.get(
-        "role",
-        "moderator"
-    )
-
-    if role not in (
-        "moderator",
-        "viewer",
-    ):
-        role = "moderator"
-
-    if (
-        len(username) < 3
-        or len(password) < 8
-    ):
-
-        flash(
-            "Username must be at least 3 characters and password at least 8 characters.",
-            "error",
-        )
-
-        return redirect(
-            url_for("admin_home")
-        )
-
-    conn = db()
-
-    try:
-
-        conn.execute(
-            qmark("""
-                INSERT INTO users
-                (
-                    username,
-                    password_hash,
-                    role
-                )
-                VALUES (?, ?, ?)
-            """),
-            (
-                username,
-                generate_password_hash(password),
-                role,
-            ),
-        )
-
-        conn.commit()
-
-        flash(
-            "Access account created.",
-            "success",
-        )
-
-    except Exception:
-
-        conn.rollback()
-
-        flash(
-            "That username may already exist.",
-            "error",
-        )
-
-    finally:
-
-        conn.close()
-
-    return redirect(
-        url_for("admin_home")
-    )
-
-
-@app.post("/admin/users/<int:user_id>/delete")
-@role_required("admin")
-def delete_user(user_id):
-
-    if user_id == session["user_id"]:
-
-        flash(
-            "You cannot remove your own account.",
-            "error",
-        )
-
-        return redirect(
-            url_for("admin_home")
-        )
-
-    conn = db()
-
-    conn.execute(
-        qmark(
-            "DELETE FROM users WHERE id = ?"
-        ),
-        (user_id,),
-    )
-
-    conn.commit()
-    conn.close()
-
-    flash(
-        "Account removed.",
-        "success",
-    )
-
-    return redirect(
-        url_for("admin_home")
     )
 
 
@@ -1142,8 +1125,13 @@ def delete_user(user_id):
 # ADD PERSONNEL
 # =========================================================
 
-@app.post("/mod/personnel/add")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/add"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def add_personnel():
 
     name = request.form.get(
@@ -1158,17 +1146,17 @@ def add_personnel():
 
     role = request.form.get(
         "role",
-        "PNP — Philippine National Police"
+        ""
     ).strip()
 
     department = request.form.get(
         "department",
-        "Pampanga Police Office"
+        ""
     ).strip()
 
     status = request.form.get(
         "status",
-        "Active"
+        ""
     ).strip()
 
     notes = request.form.get(
@@ -1177,54 +1165,65 @@ def add_personnel():
     ).strip()
 
     if not name:
+
         flash(
             "Name is required.",
-            "error"
+            "error",
         )
+
         return redirect(
             url_for("mod_home")
         )
 
     if rank not in RANKS:
+
         flash(
             "Invalid rank.",
-            "error"
+            "error",
         )
+
         return redirect(
             url_for("mod_home")
         )
 
     if role not in ROLES:
+
         flash(
             "Invalid role.",
-            "error"
+            "error",
         )
+
         return redirect(
             url_for("mod_home")
         )
 
     if department not in DEPARTMENTS:
+
         flash(
             "Invalid department.",
-            "error"
+            "error",
         )
+
         return redirect(
             url_for("mod_home")
         )
 
     if status not in STATUSES:
+
         flash(
             "Invalid status.",
-            "error"
+            "error",
         )
+
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             INSERT INTO personnel
             (
                 name,
@@ -1237,7 +1236,8 @@ def add_personnel():
                 profile_token
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """),
+            """
+        ),
         (
             name,
             rank,
@@ -1246,12 +1246,14 @@ def add_personnel():
             role,
             department,
             status,
-            secrets.token_urlsafe(24),
+            secrets.token_urlsafe(
+                32
+            ),
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Personnel added.",
@@ -1267,18 +1269,26 @@ def add_personnel():
 # UPDATE POINTS
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/points")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/points"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def update_points(person_id):
 
     try:
+
         amount = int(
             request.form.get(
                 "amount",
                 "0"
             )
         )
+
     except ValueError:
+
         amount = 0
 
     reason = request.form.get(
@@ -1308,44 +1318,58 @@ def update_points(person_id):
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    person = conn.execute(
-        qmark(
-            "SELECT * FROM personnel WHERE id = ?"
+    person = connection.execute(
+        sql(
+            """
+            SELECT *
+            FROM personnel
+            WHERE id = ?
+            """
         ),
-        (person_id,),
+        (
+            person_id,
+        ),
     ).fetchone()
 
     if not person:
 
-        conn.close()
+        connection.close()
 
-        return "Personnel not found.", 404
+        return (
+            "Personnel not found.",
+            404,
+        )
 
     new_points = max(
         0,
-        person["points"] + amount
+        person["points"]
+        + amount,
     )
 
     actual_change = (
-        new_points - person["points"]
+        new_points
+        - person["points"]
     )
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             UPDATE personnel
             SET points = ?
             WHERE id = ?
-        """),
+            """
+        ),
         (
             new_points,
             person_id,
         ),
     )
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             INSERT INTO point_log
             (
                 personnel_id,
@@ -1354,7 +1378,8 @@ def update_points(person_id):
                 changed_by
             )
             VALUES (?, ?, ?, ?)
-        """),
+            """
+        ),
         (
             person_id,
             actual_change,
@@ -1363,8 +1388,8 @@ def update_points(person_id):
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         f"Points updated for {person['name']}.",
@@ -1380,8 +1405,13 @@ def update_points(person_id):
 # UPDATE RANK
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/rank")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/rank"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def update_rank(person_id):
 
     rank = request.form.get(
@@ -1393,29 +1423,31 @@ def update_rank(person_id):
 
         flash(
             "Invalid rank.",
-            "error"
+            "error",
         )
 
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             UPDATE personnel
             SET rank = ?
             WHERE id = ?
-        """),
+            """
+        ),
         (
             rank,
             person_id,
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Rank updated.",
@@ -1431,8 +1463,13 @@ def update_rank(person_id):
 # UPDATE ROLE
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/role")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/role"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def update_role(person_id):
 
     role = request.form.get(
@@ -1444,29 +1481,31 @@ def update_role(person_id):
 
         flash(
             "Invalid role.",
-            "error"
+            "error",
         )
 
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             UPDATE personnel
             SET role = ?
             WHERE id = ?
-        """),
+            """
+        ),
         (
             role,
             person_id,
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Role updated.",
@@ -1482,8 +1521,13 @@ def update_role(person_id):
 # UPDATE DEPARTMENT
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/department")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/department"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def update_department(person_id):
 
     department = request.form.get(
@@ -1495,29 +1539,31 @@ def update_department(person_id):
 
         flash(
             "Invalid department.",
-            "error"
+            "error",
         )
 
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             UPDATE personnel
             SET department = ?
             WHERE id = ?
-        """),
+            """
+        ),
         (
             department,
             person_id,
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Department updated.",
@@ -1533,8 +1579,13 @@ def update_department(person_id):
 # UPDATE STATUS
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/status")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/status"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def update_status(person_id):
 
     status = request.form.get(
@@ -1546,29 +1597,31 @@ def update_status(person_id):
 
         flash(
             "Invalid status.",
-            "error"
+            "error",
         )
 
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             UPDATE personnel
             SET status = ?
             WHERE id = ?
-        """),
+            """
+        ),
         (
             status,
             person_id,
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Status updated.",
@@ -1581,11 +1634,201 @@ def update_status(person_id):
 
 
 # =========================================================
-# CRIMINAL RECORDS
+# UPLOAD PROFILE PICTURE
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/criminal/add")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/profile"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
+def upload_profile_picture(person_id):
+
+    photo = request.files.get(
+        "photo"
+    )
+
+    if not photo or not photo.filename:
+
+        flash(
+            "Please select a profile picture.",
+            "error",
+        )
+
+        return redirect(
+            url_for("mod_home")
+        )
+
+    image_data = photo.read(
+        MAX_PROFILE_IMAGE_SIZE + 1
+    )
+
+    if len(image_data) > MAX_PROFILE_IMAGE_SIZE:
+
+        flash(
+            "The image must be 5 MB or smaller.",
+            "error",
+        )
+
+        return redirect(
+            url_for("mod_home")
+        )
+
+    try:
+
+        image = Image.open(
+            BytesIO(image_data)
+        )
+
+        image.verify()
+
+        image = Image.open(
+            BytesIO(image_data)
+        ).convert("RGB")
+
+    except Exception:
+
+        flash(
+            "Invalid image. Use JPG, PNG, or WebP.",
+            "error",
+        )
+
+        return redirect(
+            url_for("mod_home")
+        )
+
+    # Resize while keeping proportions
+    image.thumbnail(
+        (
+            700,
+            700
+        ),
+        Image.Resampling.LANCZOS,
+    )
+
+    output = BytesIO()
+
+    image.save(
+        output,
+        format="JPEG",
+        quality=88,
+        optimize=True,
+    )
+
+    connection = db()
+
+    exists = connection.execute(
+        sql(
+            """
+            SELECT id
+            FROM personnel
+            WHERE id = ?
+            """
+        ),
+        (
+            person_id,
+        ),
+    ).fetchone()
+
+    if not exists:
+
+        connection.close()
+
+        flash(
+            "Personnel not found.",
+            "error",
+        )
+
+        return redirect(
+            url_for("mod_home")
+        )
+
+    connection.execute(
+        sql(
+            """
+            UPDATE personnel
+            SET
+                profile_image = ?,
+                profile_image_mime = ?
+            WHERE id = ?
+            """
+        ),
+        (
+            output.getvalue(),
+            "image/jpeg",
+            person_id,
+        ),
+    )
+
+    connection.commit()
+    connection.close()
+
+    flash(
+        "Profile picture updated.",
+        "success",
+    )
+
+    return redirect(
+        url_for("mod_home")
+    )
+
+
+# =========================================================
+# REMOVE PROFILE PICTURE
+# =========================================================
+
+@app.post(
+    "/mod/personnel/<int:person_id>/profile/remove"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
+def remove_profile_picture(person_id):
+
+    connection = db()
+
+    connection.execute(
+        sql(
+            """
+            UPDATE personnel
+            SET
+                profile_image = NULL,
+                profile_image_mime = NULL
+            WHERE id = ?
+            """
+        ),
+        (
+            person_id,
+        ),
+    )
+
+    connection.commit()
+    connection.close()
+
+    flash(
+        "Profile picture removed.",
+        "success",
+    )
+
+    return redirect(
+        url_for("mod_home")
+    )
+
+
+# =========================================================
+# ADD CRIMINAL RECORD
+# =========================================================
+
+@app.post(
+    "/mod/personnel/<int:person_id>/criminal/add"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def add_criminal_record(person_id):
 
     case_number = request.form.get(
@@ -1617,30 +1860,40 @@ def add_criminal_record(person_id):
 
         flash(
             "Charge is required.",
-            "error"
+            "error",
         )
 
         return redirect(
             url_for("mod_home")
         )
 
-    conn = db()
+    connection = db()
 
-    person = conn.execute(
-        qmark(
-            "SELECT id FROM personnel WHERE id = ?"
+    person = connection.execute(
+        sql(
+            """
+            SELECT id
+            FROM personnel
+            WHERE id = ?
+            """
         ),
-        (person_id,),
+        (
+            person_id,
+        ),
     ).fetchone()
 
     if not person:
 
-        conn.close()
+        connection.close()
 
-        return "Personnel not found.", 404
+        return (
+            "Personnel not found.",
+            404,
+        )
 
-    conn.execute(
-        qmark("""
+    connection.execute(
+        sql(
+            """
             INSERT INTO criminal_records
             (
                 personnel_id,
@@ -1652,7 +1905,8 @@ def add_criminal_record(person_id):
                 created_by
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """),
+            """
+        ),
         (
             person_id,
             case_number,
@@ -1664,8 +1918,8 @@ def add_criminal_record(person_id):
         ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Criminal record added.",
@@ -1677,21 +1931,35 @@ def add_criminal_record(person_id):
     )
 
 
-@app.post("/mod/criminal/<int:record_id>/delete")
-@role_required("admin", "moderator")
+# =========================================================
+# DELETE CRIMINAL RECORD
+# =========================================================
+
+@app.post(
+    "/mod/criminal/<int:record_id>/delete"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def delete_criminal_record(record_id):
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark(
-            "DELETE FROM criminal_records WHERE id = ?"
+    connection.execute(
+        sql(
+            """
+            DELETE FROM criminal_records
+            WHERE id = ?
+            """
         ),
-        (record_id,),
+        (
+            record_id,
+        ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Criminal record removed.",
@@ -1707,35 +1975,55 @@ def delete_criminal_record(record_id):
 # DELETE PERSONNEL
 # =========================================================
 
-@app.post("/mod/personnel/<int:person_id>/delete")
-@role_required("admin", "moderator")
+@app.post(
+    "/mod/personnel/<int:person_id>/delete"
+)
+@role_required(
+    "admin",
+    "moderator",
+)
 def delete_personnel(person_id):
 
-    conn = db()
+    connection = db()
 
-    conn.execute(
-        qmark(
-            "DELETE FROM criminal_records WHERE personnel_id = ?"
+    connection.execute(
+        sql(
+            """
+            DELETE FROM point_log
+            WHERE personnel_id = ?
+            """
         ),
-        (person_id,),
+        (
+            person_id,
+        ),
     )
 
-    conn.execute(
-        qmark(
-            "DELETE FROM point_log WHERE personnel_id = ?"
+    connection.execute(
+        sql(
+            """
+            DELETE FROM criminal_records
+            WHERE personnel_id = ?
+            """
         ),
-        (person_id,),
+        (
+            person_id,
+        ),
     )
 
-    conn.execute(
-        qmark(
-            "DELETE FROM personnel WHERE id = ?"
+    connection.execute(
+        sql(
+            """
+            DELETE FROM personnel
+            WHERE id = ?
+            """
         ),
-        (person_id,),
+        (
+            person_id,
+        ),
     )
 
-    conn.commit()
-    conn.close()
+    connection.commit()
+    connection.close()
 
     flash(
         "Personnel removed.",
@@ -1748,10 +2036,201 @@ def delete_personnel(person_id):
 
 
 # =========================================================
+# ADMIN
+# =========================================================
+
+@app.route("/admin")
+@role_required("admin")
+def admin_home():
+
+    connection = db()
+
+    users = connection.execute(
+        """
+        SELECT
+            id,
+            username,
+            role,
+            created_at
+        FROM users
+        ORDER BY username
+        """
+    ).fetchall()
+
+    people = connection.execute(
+        """
+        SELECT
+            id,
+            name,
+            rank,
+            role,
+            department,
+            status
+        FROM personnel
+        ORDER BY LOWER(name)
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return render_template(
+        "admin.html",
+        users=users,
+        people=people,
+    )
+
+
+# =========================================================
+# ADD USER
+# =========================================================
+
+@app.post(
+    "/admin/users/add"
+)
+@role_required("admin")
+def add_user():
+
+    username = request.form.get(
+        "username",
+        ""
+    ).strip()
+
+    password = request.form.get(
+        "password",
+        ""
+    )
+
+    role = request.form.get(
+        "role",
+        "moderator"
+    )
+
+    if role not in (
+        "moderator",
+        "viewer",
+    ):
+
+        role = "moderator"
+
+    if (
+        len(username) < 3
+        or len(password) < 8
+    ):
+
+        flash(
+            "Username must be at least 3 characters and password at least 8 characters.",
+            "error",
+        )
+
+        return redirect(
+            url_for("admin_home")
+        )
+
+    connection = db()
+
+    try:
+
+        connection.execute(
+            sql(
+                """
+                INSERT INTO users
+                (
+                    username,
+                    password_hash,
+                    role
+                )
+                VALUES (?, ?, ?)
+                """
+            ),
+            (
+                username,
+                generate_password_hash(
+                    password
+                ),
+                role,
+            ),
+        )
+
+        connection.commit()
+
+        flash(
+            "Account created.",
+            "success",
+        )
+
+    except Exception:
+
+        connection.rollback()
+
+        flash(
+            "That username may already exist.",
+            "error",
+        )
+
+    finally:
+
+        connection.close()
+
+    return redirect(
+        url_for("admin_home")
+    )
+
+
+# =========================================================
+# DELETE USER
+# =========================================================
+
+@app.post(
+    "/admin/users/<int:user_id>/delete"
+)
+@role_required("admin")
+def delete_user(user_id):
+
+    if user_id == session["user_id"]:
+
+        flash(
+            "You cannot remove your own account.",
+            "error",
+        )
+
+        return redirect(
+            url_for("admin_home")
+        )
+
+    connection = db()
+
+    connection.execute(
+        sql(
+            """
+            DELETE FROM users
+            WHERE id = ?
+            """
+        ),
+        (
+            user_id,
+        ),
+    )
+
+    connection.commit()
+    connection.close()
+
+    flash(
+        "Account removed.",
+        "success",
+    )
+
+    return redirect(
+        url_for("admin_home")
+    )
+
+
+# =========================================================
 # LOGOUT
 # =========================================================
 
-@app.get("/mod/logout")
+@app.get(
+    "/mod/logout"
+)
 def logout():
 
     session.clear()
@@ -1762,25 +2241,28 @@ def logout():
 
 
 # =========================================================
-# API SEARCH
+# SEARCH API
 # =========================================================
 
-@app.get("/api/search")
+@app.get(
+    "/api/search"
+)
 def api_search():
 
-    q = request.args.get(
+    search = request.args.get(
         "q",
         ""
     ).strip()
 
-    conn = db()
+    connection = db()
 
-    if q:
+    if search:
 
-        search_value = f"%{q}%"
+        value = f"%{search}%"
 
-        rows = conn.execute(
-            qmark("""
+        rows = connection.execute(
+            sql(
+                """
                 SELECT
                     id,
                     name,
@@ -1795,20 +2277,21 @@ def api_search():
                     OR LOWER(rank) LIKE LOWER(?)
                     OR LOWER(role) LIKE LOWER(?)
                     OR LOWER(department) LIKE LOWER(?)
-                ORDER BY name COLLATE NOCASE
+                ORDER BY LOWER(name)
                 LIMIT 50
-            """),
+                """
+            ),
             (
-                search_value,
-                search_value,
-                search_value,
-                search_value,
+                value,
+                value,
+                value,
+                value,
             ),
         ).fetchall()
 
     else:
 
-        rows = conn.execute(
+        rows = connection.execute(
             """
             SELECT
                 id,
@@ -1819,17 +2302,19 @@ def api_search():
                 department,
                 status
             FROM personnel
-            ORDER BY name COLLATE NOCASE
+            ORDER BY LOWER(name)
             LIMIT 50
             """
         ).fetchall()
 
-    conn.close()
+    connection.close()
 
-    return jsonify([
-        dict(row)
-        for row in rows
-    ])
+    return jsonify(
+        [
+            dict(row)
+            for row in rows
+        ]
+    )
 
 
 # =========================================================

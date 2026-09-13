@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Personnel Search{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="eyebrow">PUBLIC LOOKUP</div>
+  <h1>Search personnel</h1>
+  <p>Enter a name or rank to view the public personnel record.</p>
+</section>
+<form class="search" method="get">
+  <input name="q" value="{{ q }}" placeholder="Search a name..." autofocus>
+  <button>Search</button>
+</form>
+{% if q %}
+<div class="section-title">Results for “{{ q }}”</div>
+<div class="cards">
+{% for p in people %}
+<a class="person" href="{{ url_for('public_personnel', person_id=p.id) }}">
+  <div class="avatar">{{ p.name[:1]|upper }}</div>
+  <div><strong>{{ p.name }}</strong><span>{{ p.rank }}</span></div>
+  <div class="points">{{ p.points }} <small>POINTS</small></div>
+</a>
+{% else %}
+<div class="empty">No personnel found.</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="welcome">
+  <div class="bigicon">⌕</div>
+  <div><strong>Search by name</strong><span>The public page only displays information intended for members to see. Editing is restricted to the moderator area.</span></div>
+</div>
+{% endif %}
+{% endblock %}

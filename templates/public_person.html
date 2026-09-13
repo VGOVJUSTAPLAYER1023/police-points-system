@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ person.name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('public_home') }}" class="back">← Back to search</a>
+<section class="profile">
+  <div class="avatar large">{{ person.name[:1]|upper }}</div>
+  <div>
+    <div class="eyebrow">PERSONNEL RECORD</div>
+    <h1>{{ person.name }}</h1>
+    <span class="badge">{{ person.rank }}</span>
+  </div>
+  <div class="score"><small>POINTS</small><strong>{{ person.points }}</strong></div>
+</section>
+{% if person.notes %}
+<section class="panel"><h2>Information</h2><p>{{ person.notes }}</p></section>
+{% endif %}
+{% endblock %}

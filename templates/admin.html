@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <div class="eyebrow">ADMINISTRATOR</div>
+  <h1>Moderator access</h1>
+  <p>Create or remove the accounts that are allowed to edit personnel.</p>
+</section>
+
+<section class="panel">
+<h2>Create access account</h2>
+<form method="post" action="{{ url_for('add_user') }}" class="form adminform">
+<label>Username<input name="username" required></label>
+<label>Temporary password<input name="password" type="password" minlength="8" required></label>
+<label>Role<select name="role"><option value="moderator">Moderator</option><option value="viewer">Viewer</option></select></label>
+<button class="dark">Create account</button>
+</form>
+</section>
+
+<section class="panel">
+<h2>Authorized accounts</h2>
+<div class="table">
+{% for u in users %}
+<div class="row">
+<div class="name"><strong>{{ u.username }}</strong><span>{{ u.role }} · {{ u.created_at }}</span></div>
+{% if u.id != session['user_id'] %}<form method="post" action="{{ url_for('delete_user', user_id=u.id) }}"><button class="danger">Remove</button></form>{% else %}<span class="current">Current account</span>{% endif %}
+</div>
+{% endfor %}
+</div>
+</section>
+{% endblock %}

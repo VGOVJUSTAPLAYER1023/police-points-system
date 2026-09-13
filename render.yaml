@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: police-points-database
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: police-points-db
+    plan: free

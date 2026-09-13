@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="eyebrow">RESTRICTED ACCESS</div>
+  <h1>{{ title }}</h1>
+  <p>{{ subtitle }}</p>
+  <form method="post" class="form">
+    <label>Username<input name="username" required autocomplete="username"></label>
+    <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+    <button class="dark">Sign in</button>
+  </form>
+</section>
+{% endblock %}

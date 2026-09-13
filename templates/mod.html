@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Moderator Panel{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <div class="eyebrow">MODERATOR PANEL</div>
+  <h1>Manage personnel</h1>
+  <p>You are signed in as <b>{{ current_user }}</b>. Every point change is logged.</p>
+</section>
+
+<div class="grid">
+<section class="panel">
+<h2>Add personnel</h2>
+<form method="post" action="{{ url_for('add_personnel') }}" class="form">
+<label>Name<input name="name" required></label>
+<label>Rank<select name="rank">{% for r in ranks %}<option>{{ r }}</option>{% endfor %}</select></label>
+<label>Notes<textarea name="notes" rows="3"></textarea></label>
+<button class="dark">Add personnel</button>
+</form>
+</section>
+<section class="panel security">
+<h2>Access level</h2>
+<p><b>Moderator:</b> can manage points, ranks, and personnel.</p>
+<p><b>Admin:</b> everything moderators can do, plus manage moderator accounts.</p>
+<p><b>Public:</b> can only search and view published records.</p>
+</section>
+</div>
+
+<section class="panel">
+<h2>Personnel</h2>
+<div class="table">
+{% for p in people %}
+<div class="row">
+<div class="name"><strong>{{ p.name }}</strong><span>{{ p.points }} points</span></div>
+<form method="post" action="{{ url_for('update_rank', person_id=p.id) }}" class="inline">
+<select name="rank">{% for r in ranks %}<option {% if r==p.rank %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+<button class="mini">Rank</button>
+</form>
+<form method="post" action="{{ url_for('update_points', person_id=p.id) }}" class="inline pointsform">
+<input type="number" name="amount" placeholder="+10 / -5" required>
+<input name="reason" placeholder="Reason" required>
+<button class="mini">Apply points</button>
+</form>
+<form method="post" action="{{ url_for('delete_personnel', person_id=p.id) }}" onsubmit="return confirm('Delete this record?')"><button class="danger">Delete</button></form>
+</div>
+{% endfor %}
+</div>
+</section>
+{% endblock %}

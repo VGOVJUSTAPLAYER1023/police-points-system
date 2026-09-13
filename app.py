@@ -18,16 +18,21 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from PIL import Image
 
-# PostgreSQL
+# =========================================================
+# OPTIONAL POSTGRESQL
+# =========================================================
+
 try:
     import psycopg
+
     HAS_PSYCOPG = True
+
 except ImportError:
     HAS_PSYCOPG = False
 
 
 # =========================================================
-# APP
+# APP CONFIG
 # =========================================================
 
 app = Flask(__name__)
@@ -54,8 +59,8 @@ ROLES = [
     "PNP — Philippine National Police",
     "Government",
     "Management Team",
+    "BFP — Bureau of Fire Protection",
     "Medical Services",
-    "Fire & Rescue",
     "Legal / Justice",
     "Civilian",
     "Criminal",
@@ -68,10 +73,12 @@ ROLES = [
 
 
 # =========================================================
-# RANKS
+# COMBINED RANKS
 # =========================================================
 
 RANKS = [
+
+    # PNP
     "Police Officer",
     "Corporal",
     "Sergeant",
@@ -80,11 +87,51 @@ RANKS = [
     "Major",
     "Colonel",
     "Chief of Police",
+
+    # Government
+    "Governor",
+    "Vice Governor",
+    "Mayor",
+    "Vice Mayor",
+    "Municipal Executive",
+    "Judge",
+    "Vice Judge",
+    "Lawyer",
+
+    # Management
+    "Owner",
+    "Co-Owner",
+    "Management",
+    "Supervisor",
+
+    # BFP
+    "Fire Director",
+    "Fire Chief Superintendent",
+    "Fire Senior Superintendent",
+    "Fire Superintendent",
+    "Fire Chief Inspector",
+    "Fire Senior Inspector",
+    "Fire Inspector",
+    "Senior Fire Officer",
+    "Fire Officer 3",
+    "Fire Officer 2",
+    "Fire Officer 1",
+
+    # General / Other
+    "Staff",
+    "Employee",
+    "Director",
+    "Officer",
+    "Member",
+    "Manager",
+    "Representative",
+    "Citizen",
+    "None",
 ]
 
 
 # =========================================================
-# STATUSES
+# STATUS
 # =========================================================
 
 STATUSES = [
@@ -109,7 +156,7 @@ DEPARTMENTS = [
     "Special Operations",
     "Administration",
     "Internal Affairs",
-    "Fire & Rescue",
+    "BFP",
     "Medical Services",
     "Government",
     "DPWH",
@@ -121,31 +168,23 @@ DEPARTMENTS = [
 
 
 # =========================================================
-# DATABASE CONNECTION
+# DATABASE
 # =========================================================
 
 def use_postgres():
     return bool(
-        DATABASE_URL
-        and HAS_PSYCOPG
+        DATABASE_URL and HAS_PSYCOPG
     )
 
 
 def db():
-    """
-    Use PostgreSQL on Render.
-    Use SQLite when running locally.
-    """
-
     if use_postgres():
 
         connection = psycopg.connect(
             DATABASE_URL
         )
 
-        connection.row_factory = (
-            psycopg.rows.dict_row
-        )
+        connection.row_factory = psycopg.rows.dict_row
 
         return connection
 
@@ -161,32 +200,29 @@ def db():
     return connection
 
 
-def sql(sql_text):
+def sql(query):
     """
-    Convert SQLite ? placeholders
-    into PostgreSQL %s placeholders.
+    Convert SQLite ? placeholders into
+    PostgreSQL %s placeholders.
     """
 
     if use_postgres():
-        return sql_text.replace(
-            "?",
-            "%s"
-        )
+        return query.replace("?", "%s")
 
-    return sql_text
+    return query
 
 
 # =========================================================
-# DATABASE SETUP
+# DATABASE INITIALIZATION
 # =========================================================
 
 def init_db():
 
     connection = db()
 
-    # -----------------------------------------------------
-    # PostgreSQL
-    # -----------------------------------------------------
+    # =====================================================
+    # POSTGRESQL
+    # =====================================================
 
     if use_postgres():
 
@@ -246,9 +282,7 @@ def init_db():
             )
         """)
 
-        # -------------------------------------------------
-        # Upgrade older database
-        # -------------------------------------------------
+        # Existing database upgrades
 
         connection.execute("""
             ALTER TABLE personnel
@@ -283,19 +317,13 @@ def init_db():
             ADD COLUMN IF NOT EXISTS profile_image_mime TEXT
         """)
 
-        # -------------------------------------------------
-        # Give older personnel profile tokens
-        # -------------------------------------------------
-
-        old_people = connection.execute(
-            """
+        missing_tokens = connection.execute("""
             SELECT id
             FROM personnel
             WHERE profile_token IS NULL
-            """
-        ).fetchall()
+        """).fetchall()
 
-        for person in old_people:
+        for person in missing_tokens:
 
             token = secrets.token_urlsafe(32)
 
@@ -317,9 +345,9 @@ def init_db():
             ON personnel(profile_token)
         """)
 
-    # -----------------------------------------------------
-    # SQLite
-    # -----------------------------------------------------
+    # =====================================================
+    # SQLITE
+    # =====================================================
 
     else:
 
@@ -375,10 +403,6 @@ def init_db():
             );
         """)
 
-        # -------------------------------------------------
-        # Upgrade older SQLite database
-        # -------------------------------------------------
-
         columns = {
             row["name"]
             for row in connection.execute(
@@ -420,20 +444,17 @@ def init_db():
                 connection.execute(
                     f"""
                     ALTER TABLE personnel
-                    ADD COLUMN {column}
-                    {definition}
+                    ADD COLUMN {column} {definition}
                     """
                 )
 
-        old_people = connection.execute(
-            """
+        missing_tokens = connection.execute("""
             SELECT id
             FROM personnel
             WHERE profile_token IS NULL
-            """
-        ).fetchall()
+        """).fetchall()
 
-        for person in old_people:
+        for person in missing_tokens:
 
             token = secrets.token_urlsafe(32)
 
@@ -459,22 +480,19 @@ def init_db():
     # DEFAULT ADMIN
     # =====================================================
 
-    existing_admin = connection.execute(
-        sql(
-            """
+    admin_exists = connection.execute(
+        sql("""
             SELECT 1
             FROM users
             WHERE username = ?
-            """
-        ),
+        """),
         ("admin",),
     ).fetchone()
 
-    if not existing_admin:
+    if not admin_exists:
 
         connection.execute(
-            sql(
-                """
+            sql("""
                 INSERT INTO users
                 (
                     username,
@@ -482,8 +500,7 @@ def init_db():
                     role
                 )
                 VALUES (?, ?, ?)
-                """
-            ),
+            """),
             (
                 "admin",
                 generate_password_hash(
@@ -494,7 +511,7 @@ def init_db():
         )
 
     # =====================================================
-    # SAMPLE DATA ONLY IF EMPTY
+    # SAMPLE RECORDS IF EMPTY
     # =====================================================
 
     has_people = connection.execute(
@@ -513,7 +530,7 @@ def init_db():
                 "Juan Dela Cruz",
                 "Police Officer",
                 25,
-                "Example personnel",
+                "Example record",
                 "PNP — Philippine National Police",
                 "Pampanga Police Office",
                 "Active",
@@ -524,7 +541,7 @@ def init_db():
                 "Maria Santos",
                 "Sergeant",
                 60,
-                "Example personnel",
+                "Example record",
                 "PNP — Philippine National Police",
                 "Investigation Unit",
                 "Active",
@@ -533,21 +550,21 @@ def init_db():
 
             (
                 "Alex Reyes",
-                "Lieutenant",
+                "Governor",
                 95,
-                "Example personnel",
+                "Example record",
                 "Government",
-                "Administration",
+                "Government",
                 "Active",
                 secrets.token_urlsafe(32),
             ),
+
         ]
 
         for person in sample_people:
 
             connection.execute(
-                sql(
-                    """
+                sql("""
                     INSERT INTO personnel
                     (
                         name,
@@ -560,8 +577,7 @@ def init_db():
                         profile_token
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """
-                ),
+                """),
                 person,
             )
 
@@ -715,9 +731,7 @@ def public_home():
     conditions = []
     params = []
 
-    # -----------------------------------------------------
     # CASE-INSENSITIVE SEARCH
-    # -----------------------------------------------------
 
     if search:
 
@@ -732,18 +746,14 @@ def public_home():
             )
         """)
 
-        params.extend(
-            [
-                value,
-                value,
-                value,
-                value,
-            ]
-        )
+        params.extend([
+            value,
+            value,
+            value,
+            value,
+        ])
 
-    # -----------------------------------------------------
     # FILTERS
-    # -----------------------------------------------------
 
     if selected_role:
 
@@ -785,27 +795,25 @@ def public_home():
             selected_status
         )
 
-    where = ""
+    where_clause = ""
 
     if conditions:
 
-        where = (
+        where_clause = (
             "WHERE "
             + " AND ".join(
                 conditions
             )
         )
 
-    # -----------------------------------------------------
-    # TOTAL
-    # -----------------------------------------------------
+    # TOTAL RECORDS
 
     total_row = connection.execute(
         sql(
             f"""
-            SELECT COUNT(*) AS total
-            FROM personnel
-            {where}
+                SELECT COUNT(*) AS total
+                FROM personnel
+                {where_clause}
             """
         ),
         tuple(params),
@@ -813,25 +821,23 @@ def public_home():
 
     total = total_row["total"]
 
-    # -----------------------------------------------------
-    # PEOPLE
-    # -----------------------------------------------------
+    # RECORDS
 
     people = connection.execute(
         sql(
             f"""
-            SELECT
-                id,
-                name,
-                rank,
-                points,
-                role,
-                department,
-                status
-            FROM personnel
-            {where}
-            ORDER BY LOWER(name)
-            LIMIT ? OFFSET ?
+                SELECT
+                    id,
+                    name,
+                    rank,
+                    points,
+                    role,
+                    department,
+                    status
+                FROM personnel
+                {where_clause}
+                ORDER BY LOWER(name)
+                LIMIT ? OFFSET ?
             """
         ),
         tuple(params)
@@ -855,29 +861,20 @@ def public_home():
 
     return render_template(
         "public.html",
-
         people=people,
-
         q=search,
-
         page=page,
-
         total=total,
-
         total_pages=total_pages,
-
         selected_role=selected_role,
-
         selected_department=selected_department,
-
         selected_rank=selected_rank,
-
         selected_status=selected_status,
     )
 
 
 # =========================================================
-# PUBLIC PERSONNEL PROFILE
+# PUBLIC PROFILE
 # =========================================================
 
 @app.route(
@@ -888,8 +885,7 @@ def public_personnel(person_id):
     connection = db()
 
     person = connection.execute(
-        sql(
-            """
+        sql("""
             SELECT
                 id,
                 name,
@@ -901,8 +897,7 @@ def public_personnel(person_id):
                 status
             FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -918,8 +913,7 @@ def public_personnel(person_id):
         )
 
     criminal_records = connection.execute(
-        sql(
-            """
+        sql("""
             SELECT
                 id,
                 case_number,
@@ -932,8 +926,7 @@ def public_personnel(person_id):
             FROM criminal_records
             WHERE personnel_id = ?
             ORDER BY created_at DESC
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -960,15 +953,13 @@ def profile_image(person_id):
     connection = db()
 
     image = connection.execute(
-        sql(
-            """
+        sql("""
             SELECT
                 profile_image,
                 profile_image_mime
             FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -977,11 +968,9 @@ def profile_image(person_id):
     connection.close()
 
     if not image:
-
         return "", 404
 
     if not image["profile_image"]:
-
         return "", 404
 
     return send_file(
@@ -1026,13 +1015,11 @@ def mod_login():
         connection = db()
 
         user = connection.execute(
-            sql(
-                """
+            sql("""
                 SELECT *
                 FROM users
                 WHERE username = ?
-                """
-            ),
+            """),
             (
                 username,
             ),
@@ -1089,7 +1076,7 @@ def mod_login():
 
 
 # =========================================================
-# MODERATOR DASHBOARD
+# MODERATOR HOME
 # =========================================================
 
 @app.route("/mod")
@@ -1222,8 +1209,7 @@ def add_personnel():
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             INSERT INTO personnel
             (
                 name,
@@ -1236,8 +1222,7 @@ def add_personnel():
                 profile_token
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        ),
+        """),
         (
             name,
             rank,
@@ -1246,9 +1231,7 @@ def add_personnel():
             role,
             department,
             status,
-            secrets.token_urlsafe(
-                32
-            ),
+            secrets.token_urlsafe(32),
         ),
     )
 
@@ -1321,13 +1304,11 @@ def update_points(person_id):
     connection = db()
 
     person = connection.execute(
-        sql(
-            """
+        sql("""
             SELECT *
             FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -1354,13 +1335,11 @@ def update_points(person_id):
     )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET points = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             new_points,
             person_id,
@@ -1368,8 +1347,7 @@ def update_points(person_id):
     )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             INSERT INTO point_log
             (
                 personnel_id,
@@ -1378,8 +1356,7 @@ def update_points(person_id):
                 changed_by
             )
             VALUES (?, ?, ?, ?)
-            """
-        ),
+        """),
         (
             person_id,
             actual_change,
@@ -1433,13 +1410,11 @@ def update_rank(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET rank = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             rank,
             person_id,
@@ -1491,13 +1466,11 @@ def update_role(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET role = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             role,
             person_id,
@@ -1549,13 +1522,11 @@ def update_department(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET department = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             department,
             person_id,
@@ -1607,13 +1578,11 @@ def update_status(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET status = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             status,
             person_id,
@@ -1634,7 +1603,7 @@ def update_status(person_id):
 
 
 # =========================================================
-# UPLOAD PROFILE PICTURE
+# PROFILE PICTURE UPLOAD
 # =========================================================
 
 @app.post(
@@ -1661,14 +1630,14 @@ def upload_profile_picture(person_id):
             url_for("mod_home")
         )
 
-    image_data = photo.read(
+    raw = photo.read(
         MAX_PROFILE_IMAGE_SIZE + 1
     )
 
-    if len(image_data) > MAX_PROFILE_IMAGE_SIZE:
+    if len(raw) > MAX_PROFILE_IMAGE_SIZE:
 
         flash(
-            "The image must be 5 MB or smaller.",
+            "The profile picture must be 5 MB or smaller.",
             "error",
         )
 
@@ -1679,19 +1648,19 @@ def upload_profile_picture(person_id):
     try:
 
         image = Image.open(
-            BytesIO(image_data)
+            BytesIO(raw)
         )
 
         image.verify()
 
         image = Image.open(
-            BytesIO(image_data)
+            BytesIO(raw)
         ).convert("RGB")
 
     except Exception:
 
         flash(
-            "Invalid image. Use JPG, PNG, or WebP.",
+            "Invalid image. Please use JPG, PNG, or WebP.",
             "error",
         )
 
@@ -1699,11 +1668,10 @@ def upload_profile_picture(person_id):
             url_for("mod_home")
         )
 
-    # Resize while keeping proportions
     image.thumbnail(
         (
             700,
-            700
+            700,
         ),
         Image.Resampling.LANCZOS,
     )
@@ -1719,20 +1687,18 @@ def upload_profile_picture(person_id):
 
     connection = db()
 
-    exists = connection.execute(
-        sql(
-            """
+    person = connection.execute(
+        sql("""
             SELECT id
             FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
     ).fetchone()
 
-    if not exists:
+    if not person:
 
         connection.close()
 
@@ -1746,15 +1712,13 @@ def upload_profile_picture(person_id):
         )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET
                 profile_image = ?,
                 profile_image_mime = ?
             WHERE id = ?
-            """
-        ),
+        """),
         (
             output.getvalue(),
             "image/jpeg",
@@ -1791,15 +1755,13 @@ def remove_profile_picture(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             UPDATE personnel
             SET
                 profile_image = NULL,
                 profile_image_mime = NULL
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -1819,7 +1781,7 @@ def remove_profile_picture(person_id):
 
 
 # =========================================================
-# ADD CRIMINAL RECORD
+# CRIMINAL RECORD
 # =========================================================
 
 @app.post(
@@ -1869,20 +1831,18 @@ def add_criminal_record(person_id):
 
     connection = db()
 
-    person = connection.execute(
-        sql(
-            """
+    exists = connection.execute(
+        sql("""
             SELECT id
             FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
     ).fetchone()
 
-    if not person:
+    if not exists:
 
         connection.close()
 
@@ -1892,8 +1852,7 @@ def add_criminal_record(person_id):
         )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             INSERT INTO criminal_records
             (
                 personnel_id,
@@ -1905,8 +1864,7 @@ def add_criminal_record(person_id):
                 created_by
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
-        ),
+        """),
         (
             person_id,
             case_number,
@@ -1947,12 +1905,10 @@ def delete_criminal_record(record_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             DELETE FROM criminal_records
             WHERE id = ?
-            """
-        ),
+        """),
         (
             record_id,
         ),
@@ -1987,36 +1943,30 @@ def delete_personnel(person_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             DELETE FROM point_log
             WHERE personnel_id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
     )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             DELETE FROM criminal_records
             WHERE personnel_id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
     )
 
     connection.execute(
-        sql(
-            """
+        sql("""
             DELETE FROM personnel
             WHERE id = ?
-            """
-        ),
+        """),
         (
             person_id,
         ),
@@ -2131,8 +2081,7 @@ def add_user():
     try:
 
         connection.execute(
-            sql(
-                """
+            sql("""
                 INSERT INTO users
                 (
                     username,
@@ -2140,8 +2089,7 @@ def add_user():
                     role
                 )
                 VALUES (?, ?, ?)
-                """
-            ),
+            """),
             (
                 username,
                 generate_password_hash(
@@ -2200,12 +2148,10 @@ def delete_user(user_id):
     connection = db()
 
     connection.execute(
-        sql(
-            """
+        sql("""
             DELETE FROM users
             WHERE id = ?
-            """
-        ),
+        """),
         (
             user_id,
         ),
@@ -2261,8 +2207,7 @@ def api_search():
         value = f"%{search}%"
 
         rows = connection.execute(
-            sql(
-                """
+            sql("""
                 SELECT
                     id,
                     name,
@@ -2279,8 +2224,7 @@ def api_search():
                     OR LOWER(department) LIKE LOWER(?)
                 ORDER BY LOWER(name)
                 LIMIT 50
-                """
-            ),
+            """),
             (
                 value,
                 value,
@@ -2293,17 +2237,17 @@ def api_search():
 
         rows = connection.execute(
             """
-            SELECT
-                id,
-                name,
-                rank,
-                points,
-                role,
-                department,
-                status
-            FROM personnel
-            ORDER BY LOWER(name)
-            LIMIT 50
+                SELECT
+                    id,
+                    name,
+                    rank,
+                    points,
+                    role,
+                    department,
+                    status
+                FROM personnel
+                ORDER BY LOWER(name)
+                LIMIT 50
             """
         ).fetchall()
 

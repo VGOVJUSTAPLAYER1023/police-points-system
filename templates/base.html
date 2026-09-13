@@ -7,8 +7,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<header class="nav">
-  <a class="brand" href="{{ url_for('public_home') }}">POLICE <span>PERSONNEL SYSTEM</span></a>
+<header class="site-header">
+  <img src="{{ url_for('static', filename='Gemini_Generated_Image_1xzmsj1xzmsj1xzm-removebg-preview.png') }}" 
+       alt="PPR Logo" class="site-logo">
+  <h1 class="site-title">Philippine Pampanga Roleplay</h1>
   <nav>
     <a href="{{ url_for('public_home') }}">Public Search</a>
     {% if current_role == 'admin' %}<a href="{{ url_for('admin_home') }}">Admin</a>{% endif %}

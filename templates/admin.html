@@ -1,31 +1,408 @@
 {% extends "base.html" %}
-{% block title %}Admin{% endblock %}
+
+{% block title %}
+Admin Panel · Philippine Pampanga Roleplay
+{% endblock %}
+
 {% block content %}
+
 <section class="hero compact">
-  <div class="eyebrow">ADMINISTRATOR</div>
-  <h1>Moderator access</h1>
-  <p>Create or remove the accounts that are allowed to edit personnel.</p>
+
+    <div class="eyebrow">
+        ADMINISTRATOR
+    </div>
+
+    <h1>
+        Administration
+    </h1>
+
+    <p>
+        Manage authorized staff accounts and review personnel records.
+    </p>
+
 </section>
 
-<section class="panel">
-<h2>Create access account</h2>
-<form method="post" action="{{ url_for('add_user') }}" class="form adminform">
-<label>Username<input name="username" required></label>
-<label>Temporary password<input name="password" type="password" minlength="8" required></label>
-<label>Role<select name="role"><option value="moderator">Moderator</option><option value="viewer">Viewer</option></select></label>
-<button class="dark">Create account</button>
-</form>
-</section>
+
+<!-- =====================================================
+     CREATE ACCOUNT
+====================================================== -->
 
 <section class="panel">
-<h2>Authorized accounts</h2>
-<div class="table">
-{% for u in users %}
-<div class="row">
-<div class="name"><strong>{{ u.username }}</strong><span>{{ u.role }} · {{ u.created_at }}</span></div>
-{% if u.id != session['user_id'] %}<form method="post" action="{{ url_for('delete_user', user_id=u.id) }}"><button class="danger">Remove</button></form>{% else %}<span class="current">Current account</span>{% endif %}
-</div>
-{% endfor %}
-</div>
+
+    <div class="panel-heading">
+
+        <div>
+
+            <div class="eyebrow">
+                ACCESS CONTROL
+            </div>
+
+            <h2>
+                Create Staff Account
+            </h2>
+
+        </div>
+
+    </div>
+
+
+    <form
+        method="post"
+        action="{{ url_for('add_user') }}"
+        class="form"
+    >
+
+        <div class="form-grid">
+
+            <label>
+                Username
+
+                <input
+                    type="text"
+                    name="username"
+                    placeholder="Username"
+                    minlength="3"
+                    required
+                >
+            </label>
+
+
+            <label>
+                Temporary Password
+
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Minimum 8 characters"
+                    minlength="8"
+                    required
+                >
+            </label>
+
+
+            <label>
+                Access Level
+
+                <select name="role">
+
+                    <option value="moderator">
+                        Moderator
+                    </option>
+
+                    <option value="viewer">
+                        Viewer
+                    </option>
+
+                </select>
+
+            </label>
+
+        </div>
+
+
+        <button
+            type="submit"
+            class="dark"
+        >
+            Create Account
+        </button>
+
+    </form>
+
 </section>
+
+
+
+<!-- =====================================================
+     AUTHORIZED USERS
+====================================================== -->
+
+<section class="panel">
+
+    <div class="panel-heading">
+
+        <div>
+
+            <div class="eyebrow">
+                AUTHORIZED ACCESS
+            </div>
+
+            <h2>
+                Staff Accounts
+            </h2>
+
+        </div>
+
+
+        <div class="record-count">
+
+            {{ users|length }}
+
+            <span>
+                accounts
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="account-list">
+
+        {% for user in users %}
+
+        <div class="account-row">
+
+            <div class="account-icon">
+                {{ user.username[:1]|upper }}
+            </div>
+
+
+            <div class="account-information">
+
+                <strong>
+                    {{ user.username }}
+                </strong>
+
+                <span>
+
+                    {% if user.role == "admin" %}
+
+                        Administrator
+
+                    {% elif user.role == "moderator" %}
+
+                        Moderator
+
+                    {% else %}
+
+                        Viewer
+
+                    {% endif %}
+
+                    · Created {{ user.created_at }}
+
+                </span>
+
+            </div>
+
+
+            <div class="account-role">
+
+                {% if user.role == "admin" %}
+
+                    <span class="admin-badge">
+                        ADMIN
+                    </span>
+
+                {% elif user.role == "moderator" %}
+
+                    <span class="moderator-badge">
+                        MODERATOR
+                    </span>
+
+                {% else %}
+
+                    <span class="viewer-badge">
+                        VIEWER
+                    </span>
+
+                {% endif %}
+
+            </div>
+
+
+            {% if user.id != session["user_id"] %}
+
+            <form
+                method="post"
+                action="{{ url_for('delete_user', user_id=user.id) }}"
+                onsubmit="
+                    return confirm(
+                        'Remove this account?'
+                    );
+                "
+            >
+
+                <button
+                    type="submit"
+                    class="danger"
+                >
+                    Remove
+                </button>
+
+            </form>
+
+            {% else %}
+
+            <span class="current-account">
+                Current Account
+            </span>
+
+            {% endif %}
+
+        </div>
+
+        {% else %}
+
+        <div class="empty">
+
+            <strong>
+                No staff accounts.
+            </strong>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================================
+     PERSONNEL OVERVIEW
+====================================================== -->
+
+<section class="panel">
+
+    <div class="panel-heading">
+
+        <div>
+
+            <div class="eyebrow">
+                PERSONNEL DATABASE
+            </div>
+
+            <h2>
+                Personnel Overview
+            </h2>
+
+        </div>
+
+    </div>
+
+
+    <div class="admin-personnel-list">
+
+        {% for p in people %}
+
+        <div class="admin-personnel-row">
+
+
+            <!-- PFP -->
+
+            <div class="admin-person-photo">
+
+                <img
+                    src="{{ url_for(
+                        'profile_image',
+                        person_id=p.id
+                    ) }}"
+                    alt="{{ p.name }} profile picture"
+                    onerror="
+                        this.style.display='none';
+                        this.nextElementSibling.style.display='flex';
+                    "
+                >
+
+                <div
+                    class="avatar"
+                    style="display:none;"
+                >
+                    {{ p.name[:1]|upper }}
+                </div>
+
+            </div>
+
+
+            <!-- INFORMATION -->
+
+            <div class="admin-person-information">
+
+                <strong>
+                    {{ p.name }}
+                </strong>
+
+                <span>
+                    {{ p.rank }}
+                </span>
+
+                <div class="admin-meta">
+
+                    <span class="role-badge">
+                        {{ p.role }}
+                    </span>
+
+                    <span class="department-badge">
+                        {{ p.department }}
+                    </span>
+
+                    <span
+                        class="
+                        status-badge
+                        status-{{ p.status|lower|replace(' ', '-') }}
+                        "
+                    >
+
+                        {% if p.status == "Active" %}
+                            🟢
+                        {% elif p.status == "LOA" %}
+                            🔴
+                        {% elif p.status == "Suspended" %}
+                            🟡
+                        {% elif p.status == "Retired" %}
+                            ⚫
+                        {% elif p.status == "Training" %}
+                            🔵
+                        {% else %}
+                            ⚪
+                        {% endif %}
+
+                        {{ p.status }}
+
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- ACTIONS -->
+
+            <div class="admin-person-actions">
+
+                <a
+                    href="{{ url_for(
+                        'public_personnel',
+                        person_id=p.id
+                    ) }}"
+                    class="mini link"
+                    target="_blank"
+                >
+                    View Profile
+                </a>
+
+            </div>
+
+
+        </div>
+
+        {% else %}
+
+        <div class="empty">
+
+            <strong>
+                No personnel records.
+            </strong>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
 {% endblock %}

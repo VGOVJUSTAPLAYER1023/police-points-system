@@ -1,48 +1,736 @@
 {% extends "base.html" %}
-{% block title %}Moderator Panel{% endblock %}
+
+{% block title %}
+Moderator Panel · Philippine Pampanga Roleplay
+{% endblock %}
+
+
 {% block content %}
+
 <section class="hero compact">
-  <div class="eyebrow">MODERATOR PANEL</div>
-  <h1>Manage personnel</h1>
-  <p>You are signed in as <b>{{ current_user }}</b>. Every point change is logged.</p>
+
+    <div class="eyebrow">
+        MODERATOR PANEL
+    </div>
+
+    <h1>
+        Personnel Management
+    </h1>
+
+    <p>
+        Signed in as <strong>{{ current_user }}</strong>.
+        Manage personnel records, profile pictures, ranks, roles,
+        statuses, points, and criminal records.
+    </p>
+
 </section>
 
-<div class="grid">
-<section class="panel">
-<h2>Add personnel</h2>
-<form method="post" action="{{ url_for('add_personnel') }}" class="form">
-<label>Name<input name="name" required></label>
-<label>Rank<select name="rank">{% for r in ranks %}<option>{{ r }}</option>{% endfor %}</select></label>
-<label>Notes<textarea name="notes" rows="3"></textarea></label>
-<button class="dark">Add personnel</button>
-</form>
-</section>
-<section class="panel security">
-<h2>Access level</h2>
-<p><b>Moderator:</b> can manage points, ranks, and personnel.</p>
-<p><b>Admin:</b> everything moderators can do, plus manage moderator accounts.</p>
-<p><b>Public:</b> can only search and view published records.</p>
-</section>
-</div>
+
+<!-- =====================================================
+     ADD PERSONNEL
+====================================================== -->
 
 <section class="panel">
-<h2>Personnel</h2>
-<div class="table">
-{% for p in people %}
-<div class="row">
-<div class="name"><strong>{{ p.name }}</strong><span>{{ p.points }} points</span></div>
-<form method="post" action="{{ url_for('update_rank', person_id=p.id) }}" class="inline">
-<select name="rank">{% for r in ranks %}<option {% if r==p.rank %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
-<button class="mini">Rank</button>
-</form>
-<form method="post" action="{{ url_for('update_points', person_id=p.id) }}" class="inline pointsform">
-<input type="number" name="amount" placeholder="+10 / -5" required>
-<input name="reason" placeholder="Reason" required>
-<button class="mini">Apply points</button>
-</form>
-<form method="post" action="{{ url_for('delete_personnel', person_id=p.id) }}" onsubmit="return confirm('Delete this record?')"><button class="danger">Delete</button></form>
-</div>
-{% endfor %}
-</div>
+
+    <div class="panel-heading">
+
+        <div>
+            <div class="eyebrow">
+                NEW RECORD
+            </div>
+
+            <h2>
+                Add Personnel
+            </h2>
+        </div>
+
+    </div>
+
+
+    <form
+        method="post"
+        action="{{ url_for('add_personnel') }}"
+        class="form"
+    >
+
+        <div class="form-grid">
+
+            <label>
+                Name
+
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="Full name"
+                    required
+                >
+            </label>
+
+
+            <label>
+                Rank
+
+                <select name="rank" required>
+
+                    {% for item in ranks %}
+
+                    <option value="{{ item }}">
+                        {{ item }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </label>
+
+
+            <label>
+                Role
+
+                <select name="role" required>
+
+                    {% for item in roles %}
+
+                    <option value="{{ item }}">
+                        {{ item }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </label>
+
+
+            <label>
+                Department
+
+                <select name="department" required>
+
+                    {% for item in departments %}
+
+                    <option value="{{ item }}">
+                        {{ item }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </label>
+
+
+            <label>
+                Status
+
+                <select name="status" required>
+
+                    {% for item in statuses %}
+
+                    <option value="{{ item }}">
+                        {{ item }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </label>
+
+        </div>
+
+
+        <label>
+
+            Additional Information
+
+            <textarea
+                name="notes"
+                rows="4"
+                placeholder="Optional information..."
+            ></textarea>
+
+        </label>
+
+
+        <button
+            type="submit"
+            class="dark"
+        >
+            Add Personnel
+        </button>
+
+    </form>
+
 </section>
+
+
+
+<!-- =====================================================
+     PERSONNEL LIST
+====================================================== -->
+
+<section class="panel">
+
+    <div class="panel-heading">
+
+        <div>
+
+            <div class="eyebrow">
+                DATABASE
+            </div>
+
+            <h2>
+                Personnel
+            </h2>
+
+        </div>
+
+
+        <div class="record-count">
+
+            {{ people|length }}
+
+            <span>
+                records
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="personnel-management">
+
+
+        {% for p in people %}
+
+
+        <article class="management-card">
+
+
+            <!-- HEADER -->
+
+            <div class="management-header">
+
+
+                <div class="management-identity">
+
+
+                    <!-- PFP -->
+
+                    <div class="management-photo">
+
+                        <img
+                            src="{{ url_for('profile_image', person_id=p.id) }}"
+                            alt="{{ p.name }} profile picture"
+                            onerror="
+                                this.style.display='none';
+                                this.nextElementSibling.style.display='flex';
+                            "
+                        >
+
+                        <div
+                            class="avatar management-placeholder"
+                            style="display:none;"
+                        >
+                            {{ p.name[:1]|upper }}
+                        </div>
+
+                    </div>
+
+
+                    <!-- NAME -->
+
+                    <div>
+
+                        <h3>
+                            {{ p.name }}
+                        </h3>
+
+                        <span class="management-rank">
+                            {{ p.rank }}
+                        </span>
+
+                    </div>
+
+
+                </div>
+
+
+                <!-- POINTS -->
+
+                <div class="management-points">
+
+                    <strong>
+                        {{ p.points }}
+                    </strong>
+
+                    <span>
+                        POINTS
+                    </span>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- CURRENT INFO -->
+
+            <div class="management-badges">
+
+
+                <span class="role-badge">
+                    {{ p.role }}
+                </span>
+
+
+                <span class="department-badge">
+                    {{ p.department }}
+                </span>
+
+
+                <span
+                    class="status-badge status-{{ p.status|lower|replace(' ', '-') }}"
+                >
+
+                    {% if p.status == "Active" %}
+                        🟢
+                    {% elif p.status == "LOA" %}
+                        🔴
+                    {% elif p.status == "Suspended" %}
+                        🟡
+                    {% elif p.status == "Retired" %}
+                        ⚫
+                    {% elif p.status == "Training" %}
+                        🔵
+                    {% else %}
+                        ⚪
+                    {% endif %}
+
+                    {{ p.status }}
+
+                </span>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 EDIT PERSONNEL
+            ================================================== -->
+
+            <div class="management-grid">
+
+
+                <!-- RANK -->
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_rank', person_id=p.id) }}"
+                    class="management-form"
+                >
+
+                    <label>
+                        Rank
+
+                        <select name="rank">
+
+                            {% for item in ranks %}
+
+                            <option
+                                value="{{ item }}"
+                                {% if item == p.rank %}
+                                selected
+                                {% endif %}
+                            >
+                                {{ item }}
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </label>
+
+                    <button class="mini">
+                        Update Rank
+                    </button>
+
+                </form>
+
+
+
+                <!-- ROLE -->
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_role', person_id=p.id) }}"
+                    class="management-form"
+                >
+
+                    <label>
+                        Role
+
+                        <select name="role">
+
+                            {% for item in roles %}
+
+                            <option
+                                value="{{ item }}"
+                                {% if item == p.role %}
+                                selected
+                                {% endif %}
+                            >
+                                {{ item }}
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </label>
+
+                    <button class="mini">
+                        Update Role
+                    </button>
+
+                </form>
+
+
+
+                <!-- DEPARTMENT -->
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_department', person_id=p.id) }}"
+                    class="management-form"
+                >
+
+                    <label>
+                        Department
+
+                        <select name="department">
+
+                            {% for item in departments %}
+
+                            <option
+                                value="{{ item }}"
+                                {% if item == p.department %}
+                                selected
+                                {% endif %}
+                            >
+                                {{ item }}
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </label>
+
+                    <button class="mini">
+                        Update Department
+                    </button>
+
+                </form>
+
+
+
+                <!-- STATUS -->
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_status', person_id=p.id) }}"
+                    class="management-form"
+                >
+
+                    <label>
+                        Status
+
+                        <select name="status">
+
+                            {% for item in statuses %}
+
+                            <option
+                                value="{{ item }}"
+                                {% if item == p.status %}
+                                selected
+                                {% endif %}
+                            >
+                                {{ item }}
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </label>
+
+                    <button class="mini">
+                        Update Status
+                    </button>
+
+                </form>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 PROFILE PICTURE
+            ================================================== -->
+
+            <div class="management-section">
+
+
+                <div class="management-section-title">
+
+                    <strong>
+                        Profile Picture
+                    </strong>
+
+                    <span>
+                        Only moderators and admins can change this.
+                    </span>
+
+                </div>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('upload_profile_picture', person_id=p.id) }}"
+                    enctype="multipart/form-data"
+                    class="profile-upload"
+                >
+
+                    <input
+                        type="file"
+                        name="photo"
+                        accept="image/png,image/jpeg,image/webp"
+                        required
+                    >
+
+                    <button class="mini">
+                        Upload PFP
+                    </button>
+
+                </form>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('remove_profile_picture', person_id=p.id) }}"
+                    onsubmit="return confirm('Remove this profile picture?')"
+                >
+
+                    <button class="danger">
+                        Remove PFP
+                    </button>
+
+                </form>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 POINTS
+            ================================================== -->
+
+            <div class="management-section">
+
+                <div class="management-section-title">
+
+                    <strong>
+                        Points
+                    </strong>
+
+                    <span>
+                        Every change is logged.
+                    </span>
+
+                </div>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_points', person_id=p.id) }}"
+                    class="points-form-large"
+                >
+
+                    <input
+                        type="number"
+                        name="amount"
+                        placeholder="+10 or -5"
+                        required
+                    >
+
+
+                    <input
+                        type="text"
+                        name="reason"
+                        placeholder="Reason for point change"
+                        required
+                    >
+
+
+                    <button class="mini">
+                        Apply Points
+                    </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 CRIMINAL RECORD
+            ================================================== -->
+
+            <div class="management-section">
+
+                <div class="management-section-title">
+
+                    <strong>
+                        Criminal Records
+                    </strong>
+
+                    <span>
+                        Add a record to this personnel profile.
+                    </span>
+
+                </div>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('add_criminal_record', person_id=p.id) }}"
+                    class="criminal-form"
+                >
+
+                    <input
+                        type="text"
+                        name="case_number"
+                        placeholder="Case number"
+                    >
+
+
+                    <input
+                        type="text"
+                        name="charge"
+                        placeholder="Charge"
+                        required
+                    >
+
+
+                    <input
+                        type="text"
+                        name="description"
+                        placeholder="Description"
+                    >
+
+
+                    <input
+                        type="text"
+                        name="case_date"
+                        placeholder="Case date"
+                    >
+
+
+                    <select name="record_status">
+
+                        <option value="Open">
+                            Open
+                        </option>
+
+                        <option value="Closed">
+                            Closed
+                        </option>
+
+                        <option value="Dismissed">
+                            Dismissed
+                        </option>
+
+                    </select>
+
+
+                    <button class="mini">
+                        Add Record
+                    </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 DELETE
+            ================================================== -->
+
+            <div class="management-footer">
+
+
+                <a
+                    href="{{ url_for('public_personnel', person_id=p.id) }}"
+                    class="mini link"
+                    target="_blank"
+                >
+                    View Public Profile
+                </a>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('delete_personnel', person_id=p.id) }}"
+                    onsubmit="
+                        return confirm(
+                            'Are you sure you want to permanently delete this personnel record?'
+                        );
+                    "
+                >
+
+                    <button class="danger">
+                        Delete Personnel
+                    </button>
+
+                </form>
+
+            </div>
+
+
+        </article>
+
+
+        {% else %}
+
+
+        <div class="empty">
+
+            <strong>
+                No personnel records yet.
+            </strong>
+
+            <span>
+                Add your first personnel record above.
+            </span>
+
+        </div>
+
+
+        {% endfor %}
+
+
+    </div>
+
+</section>
+
 {% endblock %}

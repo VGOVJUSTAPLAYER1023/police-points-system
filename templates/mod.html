@@ -170,7 +170,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
 <!-- =====================================================
-     PERSONNEL LIST
+     PERSONNEL DATABASE
 ====================================================== -->
 
 <section class="panel">
@@ -203,16 +203,131 @@ Moderator Panel · Philippine Pampanga Roleplay
     </div>
 
 
-    <div class="personnel-management">
+    <!-- =====================================================
+         SEARCH & FILTER
+    ====================================================== -->
+
+    <div
+        class="personnel-toolbar"
+        style="
+            margin-bottom: 24px;
+            padding: 18px;
+            border-radius: 14px;
+            background: rgba(0,0,0,0.04);
+        "
+    >
+
+        <div
+            style="
+                display:flex;
+                gap:12px;
+                flex-wrap:wrap;
+                align-items:center;
+            "
+        >
+
+            <!-- SEARCH -->
+
+            <input
+                id="personnelSearch"
+                type="search"
+                placeholder="Search personnel..."
+                autocomplete="off"
+                aria-label="Search personnel"
+                style="
+                    flex:1;
+                    min-width:260px;
+                "
+            >
+
+
+            <!-- STATUS -->
+
+            <select
+                id="personnelStatusFilter"
+                aria-label="Filter by status"
+            >
+
+                <option value="">
+                    All Statuses
+                </option>
+
+                {% for item in statuses %}
+
+                <option value="{{ item|lower }}">
+                    {{ item }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+
+            <!-- DEPARTMENT -->
+
+            <select
+                id="personnelDepartmentFilter"
+                aria-label="Filter by department"
+            >
+
+                <option value="">
+                    All Departments
+                </option>
+
+                {% for item in departments %}
+
+                <option value="{{ item|lower }}">
+                    {{ item }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <div
+            id="personnelSearchSummary"
+            style="
+                margin-top:10px;
+                opacity:.70;
+            "
+            aria-live="polite"
+        >
+            Showing {{ people|length }} personnel records
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         PERSONNEL RECORDS
+    ====================================================== -->
+
+    <div
+        class="personnel-management"
+        id="personnelManagement"
+    >
 
 
         {% for p in people %}
 
 
-        <article class="management-card">
+        <article
+            class="management-card personnel-record"
+            data-person-name="{{ p.name|lower|e }}"
+            data-person-rank="{{ p.rank|lower|e }}"
+            data-person-role="{{ p.role|lower|e }}"
+            data-person-department="{{ p.department|lower|e }}"
+            data-person-status="{{ p.status|lower|e }}"
+        >
 
 
-            <!-- HEADER -->
+            <!-- =================================================
+                 HEADER
+            ================================================== -->
 
             <div class="management-header">
 
@@ -220,18 +335,20 @@ Moderator Panel · Philippine Pampanga Roleplay
                 <div class="management-identity">
 
 
-                    <!-- PFP -->
+                    <!-- PROFILE PICTURE -->
 
                     <div class="management-photo">
 
                         <img
                             src="{{ url_for('profile_image', person_id=p.id) }}"
                             alt="{{ p.name }} profile picture"
+
                             onerror="
                                 this.style.display='none';
                                 this.nextElementSibling.style.display='flex';
                             "
                         >
+
 
                         <div
                             class="avatar management-placeholder"
@@ -241,6 +358,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </div>
 
                     </div>
+
 
 
                     <!-- NAME -->
@@ -259,6 +377,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
                 </div>
+
 
 
                 <!-- POINTS -->
@@ -280,7 +399,9 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
 
-            <!-- CURRENT INFO -->
+            <!-- =================================================
+                 CURRENT INFORMATION
+            ================================================== -->
 
             <div class="management-badges">
 
@@ -300,17 +421,29 @@ Moderator Panel · Philippine Pampanga Roleplay
                 >
 
                     {% if p.status == "Active" %}
+
                         🟢
+
                     {% elif p.status == "LOA" %}
+
                         🔴
+
                     {% elif p.status == "Suspended" %}
+
                         🟡
+
                     {% elif p.status == "Retired" %}
+
                         ⚫
+
                     {% elif p.status == "Training" %}
+
                         🔵
+
                     {% else %}
+
                         ⚪
+
                     {% endif %}
 
                     {{ p.status }}
@@ -323,19 +456,61 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
             <!-- =================================================
-                 EDIT NAME & ADDITIONAL INFORMATION
+                 ACTION BUTTONS
             ================================================== -->
 
-            <div class="management-section">
+            <div
+                style="
+                    margin-top:18px;
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                "
+            >
+
+                <button
+                    type="button"
+                    class="dark mini edit-personnel-toggle"
+                    data-target="editor-{{ p.id }}"
+                    aria-expanded="false"
+                >
+                    Edit Personnel
+                </button>
+
+
+                <a
+                    href="{{ url_for('public_person', person_id=p.id) }}"
+                    class="mini link"
+                    target="_blank"
+                >
+                    View Profile
+                </a>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 EDIT PERSONNEL
+            ================================================== -->
+
+            <div
+                id="editor-{{ p.id }}"
+                class="management-section personnel-editor"
+                style="
+                    display:none;
+                    margin-top:16px;
+                "
+            >
 
                 <div class="management-section-title">
 
                     <strong>
-                        Edit Name & Additional Information
+                        Edit Personnel Information
                     </strong>
 
                     <span>
-                        Update this existing personnel record without deleting it.
+                        Update this existing record without deleting it.
                     </span>
 
                 </div>
@@ -347,9 +522,14 @@ Moderator Panel · Philippine Pampanga Roleplay
                     class="form"
                 >
 
+
                     <div class="form-grid">
 
+
+                        <!-- NAME -->
+
                         <label>
+
                             Name
 
                             <input
@@ -359,20 +539,29 @@ Moderator Panel · Philippine Pampanga Roleplay
                                 placeholder="Full name"
                                 required
                             >
+
                         </label>
 
 
+
+                        <!-- RANK -->
+
                         <label>
+
                             Rank
 
-                            <select name="rank" required>
+                            <select
+                                name="rank"
+                                required
+                            >
 
                                 {% for item in ranks %}
 
                                 <option
                                     value="{{ item }}"
+
                                     {% if item == p.rank %}
-                                    selected
+                                        selected
                                     {% endif %}
                                 >
                                     {{ item }}
@@ -385,17 +574,25 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </label>
 
 
+
+                        <!-- ROLE -->
+
                         <label>
+
                             Role
 
-                            <select name="role" required>
+                            <select
+                                name="role"
+                                required
+                            >
 
                                 {% for item in roles %}
 
                                 <option
                                     value="{{ item }}"
+
                                     {% if item == p.role %}
-                                    selected
+                                        selected
                                     {% endif %}
                                 >
                                     {{ item }}
@@ -408,17 +605,25 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </label>
 
 
+
+                        <!-- DEPARTMENT -->
+
                         <label>
+
                             Department
 
-                            <select name="department" required>
+                            <select
+                                name="department"
+                                required
+                            >
 
                                 {% for item in departments %}
 
                                 <option
                                     value="{{ item }}"
+
                                     {% if item == p.department %}
-                                    selected
+                                        selected
                                     {% endif %}
                                 >
                                     {{ item }}
@@ -431,17 +636,25 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </label>
 
 
+
+                        <!-- STATUS -->
+
                         <label>
+
                             Status
 
-                            <select name="status" required>
+                            <select
+                                name="status"
+                                required
+                            >
 
                                 {% for item in statuses %}
 
                                 <option
                                     value="{{ item }}"
+
                                     {% if item == p.status %}
-                                    selected
+                                        selected
                                     {% endif %}
                                 >
                                     {{ item }}
@@ -453,8 +666,12 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                         </label>
 
+
                     </div>
 
+
+
+                    <!-- ADDITIONAL INFORMATION -->
 
                     <label>
 
@@ -469,312 +686,18 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </label>
 
 
+
+                    <!-- SAVE -->
+
                     <button
                         type="submit"
                         class="dark"
                     >
-                        Save Personnel Information
+                        Save Changes
                     </button>
 
-                </form>
-
-            </div>
-
-
-
-            <!-- =================================================
-                 QUICK PERSONNEL UPDATES
-            ================================================== -->
-
-            <div class="management-grid">
-
-
-                <!-- RANK -->
-
-                <form
-                    method="post"
-                    action="{{ url_for('update_personnel', person_id=p.id) }}"
-                    class="management-form"
-                >
-
-                    <input
-                        type="hidden"
-                        name="name"
-                        value="{{ p.name }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="role"
-                        value="{{ p.role }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="department"
-                        value="{{ p.department }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="status"
-                        value="{{ p.status }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="notes"
-                        value="{{ p.notes or '' }}"
-                    >
-
-                    <label>
-                        Rank
-
-                        <select name="rank">
-
-                            {% for item in ranks %}
-
-                            <option
-                                value="{{ item }}"
-                                {% if item == p.rank %}
-                                selected
-                                {% endif %}
-                            >
-                                {{ item }}
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </label>
-
-
-                    <button
-                        type="submit"
-                        class="mini"
-                    >
-                        Update Rank
-                    </button>
 
                 </form>
-
-
-
-                <!-- ROLE -->
-
-                <form
-                    method="post"
-                    action="{{ url_for('update_personnel', person_id=p.id) }}"
-                    class="management-form"
-                >
-
-                    <input
-                        type="hidden"
-                        name="name"
-                        value="{{ p.name }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="rank"
-                        value="{{ p.rank }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="department"
-                        value="{{ p.department }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="status"
-                        value="{{ p.status }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="notes"
-                        value="{{ p.notes or '' }}"
-                    >
-
-                    <label>
-                        Role
-
-                        <select name="role">
-
-                            {% for item in roles %}
-
-                            <option
-                                value="{{ item }}"
-                                {% if item == p.role %}
-                                selected
-                                {% endif %}
-                            >
-                                {{ item }}
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </label>
-
-
-                    <button
-                        type="submit"
-                        class="mini"
-                    >
-                        Update Role
-                    </button>
-
-                </form>
-
-
-
-                <!-- DEPARTMENT -->
-
-                <form
-                    method="post"
-                    action="{{ url_for('update_personnel', person_id=p.id) }}"
-                    class="management-form"
-                >
-
-                    <input
-                        type="hidden"
-                        name="name"
-                        value="{{ p.name }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="rank"
-                        value="{{ p.rank }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="role"
-                        value="{{ p.role }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="status"
-                        value="{{ p.status }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="notes"
-                        value="{{ p.notes or '' }}"
-                    >
-
-                    <label>
-                        Department
-
-                        <select name="department">
-
-                            {% for item in departments %}
-
-                            <option
-                                value="{{ item }}"
-                                {% if item == p.department %}
-                                selected
-                                {% endif %}
-                            >
-                                {{ item }}
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </label>
-
-
-                    <button
-                        type="submit"
-                        class="mini"
-                    >
-                        Update Department
-                    </button>
-
-                </form>
-
-
-
-                <!-- STATUS -->
-
-                <form
-                    method="post"
-                    action="{{ url_for('update_personnel', person_id=p.id) }}"
-                    class="management-form"
-                >
-
-                    <input
-                        type="hidden"
-                        name="name"
-                        value="{{ p.name }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="rank"
-                        value="{{ p.rank }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="role"
-                        value="{{ p.role }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="department"
-                        value="{{ p.department }}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="notes"
-                        value="{{ p.notes or '' }}"
-                    >
-
-                    <label>
-                        Status
-
-                        <select name="status">
-
-                            {% for item in statuses %}
-
-                            <option
-                                value="{{ item }}"
-                                {% if item == p.status %}
-                                selected
-                                {% endif %}
-                            >
-                                {{ item }}
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </label>
-
-
-                    <button
-                        type="submit"
-                        class="mini"
-                    >
-                        Update Status
-                    </button>
-
-                </form>
-
 
             </div>
 
@@ -798,6 +721,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </span>
 
                 </div>
+
 
 
                 <form
@@ -825,10 +749,15 @@ Moderator Panel · Philippine Pampanga Roleplay
                 </form>
 
 
+
                 <form
                     method="post"
                     action="{{ url_for('remove_profile_image', person_id=p.id) }}"
-                    onsubmit="return confirm('Remove this profile picture?')"
+                    onsubmit="
+                        return confirm(
+                            'Remove this profile picture?'
+                        );
+                    "
                 >
 
                     <button
@@ -851,6 +780,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
             <div class="management-section">
 
+
                 <div class="management-section-title">
 
                     <strong>
@@ -862,6 +792,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </span>
 
                 </div>
+
 
 
                 <form
@@ -895,6 +826,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                 </form>
 
+
             </div>
 
 
@@ -904,6 +836,7 @@ Moderator Panel · Philippine Pampanga Roleplay
             ================================================== -->
 
             <div class="management-section">
+
 
                 <div class="management-section-title">
 
@@ -918,11 +851,13 @@ Moderator Panel · Philippine Pampanga Roleplay
                 </div>
 
 
+
                 <form
                     method="post"
                     action="{{ url_for('add_criminal_record', person_id=p.id) }}"
                     class="criminal-form"
                 >
+
 
                     <input
                         type="text"
@@ -970,6 +905,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </select>
 
 
+
                     <button
                         type="submit"
                         class="mini"
@@ -977,7 +913,9 @@ Moderator Panel · Philippine Pampanga Roleplay
                         Add Record
                     </button>
 
+
                 </form>
+
 
             </div>
 
@@ -988,15 +926,6 @@ Moderator Panel · Philippine Pampanga Roleplay
             ================================================== -->
 
             <div class="management-footer">
-
-
-                <a
-                    href="{{ url_for('public_person', person_id=p.id) }}"
-                    class="mini link"
-                    target="_blank"
-                >
-                    View Public Profile
-                </a>
 
 
                 <form
@@ -1028,6 +957,10 @@ Moderator Panel · Philippine Pampanga Roleplay
         {% else %}
 
 
+        <!-- =================================================
+             EMPTY
+        ================================================== -->
+
         <div class="empty">
 
             <strong>
@@ -1047,5 +980,276 @@ Moderator Panel · Philippine Pampanga Roleplay
     </div>
 
 </section>
+
+
+
+<!-- =====================================================
+     SEARCH + EDIT JAVASCRIPT
+====================================================== -->
+
+<script>
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+
+        const searchInput =
+            document.getElementById(
+                "personnelSearch"
+            );
+
+
+        const statusFilter =
+            document.getElementById(
+                "personnelStatusFilter"
+            );
+
+
+        const departmentFilter =
+            document.getElementById(
+                "personnelDepartmentFilter"
+            );
+
+
+        const summary =
+            document.getElementById(
+                "personnelSearchSummary"
+            );
+
+
+        const records =
+            Array.from(
+                document.querySelectorAll(
+                    ".personnel-record"
+                )
+            );
+
+
+
+        /* =====================================================
+           SEARCH + FILTER
+        ====================================================== */
+
+        function filterPersonnel() {
+
+
+            const query =
+                (
+                    searchInput.value || ""
+                )
+                .trim()
+                .toLowerCase();
+
+
+            const selectedStatus =
+                (
+                    statusFilter.value || ""
+                )
+                .trim()
+                .toLowerCase();
+
+
+            const selectedDepartment =
+                (
+                    departmentFilter.value || ""
+                )
+                .trim()
+                .toLowerCase();
+
+
+
+            let visibleCount = 0;
+
+
+
+            records.forEach(
+                function (record) {
+
+
+                    const searchableText = [
+
+                        record.dataset.personName || "",
+
+                        record.dataset.personRank || "",
+
+                        record.dataset.personRole || "",
+
+                        record.dataset.personDepartment || "",
+
+                        record.dataset.personStatus || ""
+
+                    ].join(" ");
+
+
+
+                    const matchesSearch =
+                        !query ||
+                        searchableText.includes(
+                            query
+                        );
+
+
+
+                    const matchesStatus =
+                        !selectedStatus ||
+                        record.dataset.personStatus ===
+                            selectedStatus;
+
+
+
+                    const matchesDepartment =
+                        !selectedDepartment ||
+                        record.dataset.personDepartment ===
+                            selectedDepartment;
+
+
+
+                    const shouldShow =
+                        matchesSearch &&
+                        matchesStatus &&
+                        matchesDepartment;
+
+
+
+                    record.style.display =
+                        shouldShow
+                            ? ""
+                            : "none";
+
+
+
+                    if (shouldShow) {
+
+                        visibleCount++;
+
+                    }
+
+
+                }
+            );
+
+
+
+            summary.textContent =
+                "Showing " +
+                visibleCount +
+                " of " +
+                records.length +
+                " personnel records";
+
+
+        }
+
+
+
+        searchInput.addEventListener(
+            "input",
+            filterPersonnel
+        );
+
+
+        statusFilter.addEventListener(
+            "change",
+            filterPersonnel
+        );
+
+
+        departmentFilter.addEventListener(
+            "change",
+            filterPersonnel
+        );
+
+
+
+        /* =====================================================
+           EDIT BUTTON
+        ====================================================== */
+
+        document
+            .querySelectorAll(
+                ".edit-personnel-toggle"
+            )
+            .forEach(
+                function (button) {
+
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+
+                            const editor =
+                                document.getElementById(
+                                    button.dataset.target
+                                );
+
+
+                            if (!editor) {
+
+                                return;
+
+                            }
+
+
+
+                            const isOpen =
+                                editor.style.display !==
+                                    "none";
+
+
+
+                            editor.style.display =
+                                isOpen
+                                    ? "none"
+                                    : "block";
+
+
+
+                            button.setAttribute(
+                                "aria-expanded",
+                                String(!isOpen)
+                            );
+
+
+
+                            button.textContent =
+                                isOpen
+                                    ? "Edit Personnel"
+                                    : "Close Editor";
+
+
+
+                            if (!isOpen) {
+
+
+                                editor.scrollIntoView(
+                                    {
+                                        behavior: "smooth",
+                                        block: "nearest"
+                                    }
+                                );
+
+
+                            }
+
+
+                        }
+                    );
+
+
+                }
+            );
+
+
+
+        filterPersonnel();
+
+
+    }
+);
+
+</script>
+
 
 {% endblock %}

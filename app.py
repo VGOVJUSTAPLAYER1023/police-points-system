@@ -662,6 +662,7 @@ def public_home():
                 OR role ILIKE {ph}
                 OR department ILIKE {ph}
                 OR status ILIKE {ph}
+                OR notes ILIKE {ph}
             )
             """
             if is_postgres()
@@ -673,11 +674,13 @@ def public_home():
                 OR LOWER(role) LIKE LOWER({ph})
                 OR LOWER(department) LIKE LOWER({ph})
                 OR LOWER(status) LIKE LOWER({ph})
+                OR LOWER(notes) LIKE LOWER({ph})
             )
             """
         )
 
         params.extend([
+            search,
             search,
             search,
             search,
@@ -2158,6 +2161,7 @@ def api_search():
                     OR role ILIKE {ph}
                     OR department ILIKE {ph}
                     OR status ILIKE {ph}
+                    OR notes ILIKE {ph}
             """
 
         else:
@@ -2169,9 +2173,11 @@ def api_search():
                     OR LOWER(role) LIKE LOWER({ph})
                     OR LOWER(department) LIKE LOWER({ph})
                     OR LOWER(status) LIKE LOWER({ph})
+                    OR LOWER(notes) LIKE LOWER({ph})
             """
 
         params = [
+            search,
             search,
             search,
             search,

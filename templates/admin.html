@@ -48,7 +48,7 @@ Admin Panel · Philippine Pampanga Roleplay
 
     <form
         method="post"
-        action="{{ url_for('add_user') }}"
+        action="{{ url_for('create_staff') }}"
         class="form"
     >
 
@@ -89,8 +89,8 @@ Admin Panel · Philippine Pampanga Roleplay
                         Moderator
                     </option>
 
-                    <option value="viewer">
-                        Viewer
+                    <option value="admin">
+                        Administrator
                     </option>
 
                 </select>
@@ -176,7 +176,7 @@ Admin Panel · Philippine Pampanga Roleplay
 
                     {% else %}
 
-                        Viewer
+                        Unknown
 
                     {% endif %}
 
@@ -204,7 +204,7 @@ Admin Panel · Philippine Pampanga Roleplay
                 {% else %}
 
                     <span class="viewer-badge">
-                        VIEWER
+                        UNKNOWN
                     </span>
 
                 {% endif %}
@@ -216,7 +216,7 @@ Admin Panel · Philippine Pampanga Roleplay
 
             <form
                 method="post"
-                action="{{ url_for('delete_user', user_id=user.id) }}"
+                action="{{ url_for('delete_staff', user_id=user.id) }}"
                 onsubmit="
                     return confirm(
                         'Remove this account?'
@@ -375,7 +375,7 @@ Admin Panel · Philippine Pampanga Roleplay
 
                 <a
                     href="{{ url_for(
-                        'public_personnel',
+                        'public_person',
                         person_id=p.id
                     ) }}"
                     class="mini link"

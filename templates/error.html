@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }}{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width: 700px; margin: 60px auto; text-align: center; padding: 40px;">
+
+    <h1 style="font-size: 48px; margin-bottom: 10px;">
+        {{ error_code }}
+    </h1>
+
+    <h2>
+        Something went wrong
+    </h2>
+
+    <p>
+        {{ error_message }}
+    </p>
+
+    <a href="{{ url_for('public_home') }}" class="btn">
+        Return to Public Search
+    </a>
+
+</div>
+
+{% endblock %}

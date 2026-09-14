@@ -4,7 +4,6 @@
 Moderator Panel · Philippine Pampanga Roleplay
 {% endblock %}
 
-
 {% block content %}
 
 <section class="hero compact">
@@ -36,6 +35,7 @@ Moderator Panel · Philippine Pampanga Roleplay
     <div class="panel-heading">
 
         <div>
+
             <div class="eyebrow">
                 NEW RECORD
             </div>
@@ -43,6 +43,7 @@ Moderator Panel · Philippine Pampanga Roleplay
             <h2>
                 Add Personnel
             </h2>
+
         </div>
 
     </div>
@@ -322,7 +323,167 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
             <!-- =================================================
-                 EDIT PERSONNEL
+                 EDIT NAME & ADDITIONAL INFORMATION
+            ================================================== -->
+
+            <div class="management-section">
+
+                <div class="management-section-title">
+
+                    <strong>
+                        Edit Name & Additional Information
+                    </strong>
+
+                    <span>
+                        Update this existing personnel record without deleting it.
+                    </span>
+
+                </div>
+
+
+                <form
+                    method="post"
+                    action="{{ url_for('update_personnel', person_id=p.id) }}"
+                    class="form"
+                >
+
+                    <div class="form-grid">
+
+                        <label>
+                            Name
+
+                            <input
+                                type="text"
+                                name="name"
+                                value="{{ p.name }}"
+                                placeholder="Full name"
+                                required
+                            >
+                        </label>
+
+
+                        <label>
+                            Rank
+
+                            <select name="rank" required>
+
+                                {% for item in ranks %}
+
+                                <option
+                                    value="{{ item }}"
+                                    {% if item == p.rank %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ item }}
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </label>
+
+
+                        <label>
+                            Role
+
+                            <select name="role" required>
+
+                                {% for item in roles %}
+
+                                <option
+                                    value="{{ item }}"
+                                    {% if item == p.role %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ item }}
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </label>
+
+
+                        <label>
+                            Department
+
+                            <select name="department" required>
+
+                                {% for item in departments %}
+
+                                <option
+                                    value="{{ item }}"
+                                    {% if item == p.department %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ item }}
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </label>
+
+
+                        <label>
+                            Status
+
+                            <select name="status" required>
+
+                                {% for item in statuses %}
+
+                                <option
+                                    value="{{ item }}"
+                                    {% if item == p.status %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ item }}
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </label>
+
+                    </div>
+
+
+                    <label>
+
+                        Additional Information
+
+                        <textarea
+                            name="notes"
+                            rows="4"
+                            placeholder="Additional information..."
+                        >{{ p.notes or '' }}</textarea>
+
+                    </label>
+
+
+                    <button
+                        type="submit"
+                        class="dark"
+                    >
+                        Save Personnel Information
+                    </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 QUICK PERSONNEL UPDATES
             ================================================== -->
 
             <div class="management-grid">
@@ -387,6 +548,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </select>
 
                     </label>
+
 
                     <button
                         type="submit"
@@ -459,6 +621,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
+
                     <button
                         type="submit"
                         class="mini"
@@ -529,6 +692,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                         </select>
 
                     </label>
+
 
                     <button
                         type="submit"
@@ -601,6 +765,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
+
                     <button
                         type="submit"
                         class="mini"
@@ -648,6 +813,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                         accept="image/png,image/jpeg,image/webp"
                         required
                     >
+
 
                     <button
                         type="submit"
@@ -851,6 +1017,7 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </button>
 
                 </form>
+
 
             </div>
 

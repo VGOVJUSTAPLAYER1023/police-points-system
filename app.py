@@ -66,10 +66,17 @@ ROLES = [
 
 DEPARTMENTS = [
     "Pampanga Police Office",
-    "Patrol Unit",
-    "Traffic Unit",
-    "Investigation Unit",
-    "Special Operations",
+
+    # Specialized Police Units
+    "SWAT — Special Weapons and Tactics",
+    "SAF — Special Action Force",
+    "HPG — Highway Patrol Group",
+    "TS — Training Service",
+    "PSPG — Police Security and Protection Group",
+    "PDEA — Philippine Drug Enforcement Agency",
+    "CIDG — Criminal Investigation and Detection Group",
+
+    # Other Departments
     "Administration",
     "Internal Affairs",
     "BFP",

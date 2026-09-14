@@ -21,8 +21,10 @@ from PIL import Image
 
 try:
     import psycopg
+    from psycopg.rows import dict_row
 except ImportError:
     psycopg = None
+    dict_row = None
 
 
 # =========================================================
@@ -81,9 +83,7 @@ DEPARTMENTS = [
 ]
 
 RANKS = [
-    # =========================
-    # POLICE
-    # =========================
+    # Police
     "Police Officer",
     "Corporal",
     "Sergeant",
@@ -93,9 +93,7 @@ RANKS = [
     "Colonel",
     "Chief of Police",
 
-    # =========================
-    # GOVERNMENT
-    # =========================
+    # Government
     "Governor",
     "Vice Governor",
     "Mayor",
@@ -109,9 +107,7 @@ RANKS = [
     "Government Staff",
     "Government Employee",
 
-    # =========================
     # BFP
-    # =========================
     "Fire Director",
     "Fire Chief Superintendent",
     "Fire Senior Superintendent",
@@ -124,9 +120,7 @@ RANKS = [
     "Fire Officer 2",
     "Fire Officer 1",
 
-    # =========================
     # DPWH
-    # =========================
     "DPWH Director",
     "DPWH Assistant Director",
     "DPWH Division Chief",
@@ -138,17 +132,13 @@ RANKS = [
     "DPWH Staff",
     "DPWH Employee",
 
-    # =========================
-    # MANAGEMENT
-    # =========================
+    # Management
     "Owner",
     "Co-Owner",
     "Management",
     "Supervisor",
 
-    # =========================
-    # GENERAL
-    # =========================
+    # General
     "Staff",
     "Employee",
     "Director",
@@ -171,27 +161,30 @@ STATUSES = [
 
 
 # =========================================================
-# DATABASE
+# DATABASE HELPERS
 # =========================================================
 
 def is_postgres():
-    return bool(DATABASE_URL and DATABASE_URL.startswith(("postgres://", "postgresql://")))
+    return bool(
+        DATABASE_URL
+        and DATABASE_URL.startswith(
+            ("postgres://", "postgresql://")
+        )
+    )
 
 
 def get_db():
-    """
-    Returns:
-        psycopg connection on Render/PostgreSQL
-        sqlite3 connection locally
-    """
-
     if is_postgres():
+
         if psycopg is None:
             raise RuntimeError(
                 "PostgreSQL is configured but psycopg is not installed."
             )
 
-        return psycopg.connect(DATABASE_URL)
+        return psycopg.connect(
+            DATABASE_URL,
+            row_factory=dict_row
+        )
 
     db = sqlite3.connect("police_points.db")
     db.row_factory = sqlite3.Row
@@ -202,11 +195,41 @@ def placeholder():
     return "%s" if is_postgres() else "?"
 
 
-def execute(query, params=(), fetchone=False, fetchall=False, commit=False):
+def row_value(row, key, index=None, default=None):
     """
-    Database helper that supports PostgreSQL and SQLite.
+    Safely get a value from either a dict-like row or sqlite row/tuple.
     """
 
+    if row is None:
+        return default
+
+    try:
+        if isinstance(row, dict):
+            return row.get(key, default)
+    except Exception:
+        pass
+
+    try:
+        return row[key]
+    except Exception:
+        pass
+
+    if index is not None:
+        try:
+            return row[index]
+        except Exception:
+            pass
+
+    return default
+
+
+def execute(
+    query,
+    params=(),
+    fetchone=False,
+    fetchall=False,
+    commit=False,
+):
     db = get_db()
 
     try:
@@ -217,8 +240,7 @@ def execute(query, params=(), fetchone=False, fetchall=False, commit=False):
         result = None
 
         if fetchone:
-            row = cur.fetchone()
-            result = row
+            result = cur.fetchone()
 
         elif fetchall:
             result = cur.fetchall()
@@ -237,10 +259,16 @@ def execute(query, params=(), fetchone=False, fetchall=False, commit=False):
 # =========================================================
 
 def init_db():
+
     db = get_db()
 
     try:
+
         cur = db.cursor()
+
+        # -------------------------------------------------
+        # USERS
+        # -------------------------------------------------
 
         if is_postgres():
 
@@ -253,6 +281,10 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # -------------------------------------------------
+            # PERSONNEL
+            # -------------------------------------------------
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS personnel (
@@ -271,6 +303,10 @@ def init_db():
                 )
             """)
 
+            # -------------------------------------------------
+            # POINT LOG
+            # -------------------------------------------------
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS point_log (
                     id SERIAL PRIMARY KEY,
@@ -281,6 +317,10 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # -------------------------------------------------
+            # CRIMINAL RECORDS
+            # -------------------------------------------------
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS criminal_records (
@@ -353,47 +393,72 @@ def init_db():
         db.commit()
 
         # -------------------------------------------------
-        # Ensure older personnel databases get new columns
+        # SQLITE MIGRATION
         # -------------------------------------------------
 
         if not is_postgres():
 
             cur.execute("PRAGMA table_info(personnel)")
-            columns = {row[1] for row in cur.fetchall()}
+
+            columns = {
+                row[1]
+                for row in cur.fetchall()
+            }
 
             migrations = {
-                "notes": "ALTER TABLE personnel ADD COLUMN notes TEXT DEFAULT ''",
-                "role": "ALTER TABLE personnel ADD COLUMN role TEXT DEFAULT ''",
-                "department": "ALTER TABLE personnel ADD COLUMN department TEXT DEFAULT ''",
-                "status": "ALTER TABLE personnel ADD COLUMN status TEXT DEFAULT 'Active'",
-                "profile_token": "ALTER TABLE personnel ADD COLUMN profile_token TEXT",
-                "profile_image": "ALTER TABLE personnel ADD COLUMN profile_image BLOB",
-                "profile_image_mime": "ALTER TABLE personnel ADD COLUMN profile_image_mime TEXT",
+                "notes":
+                    "ALTER TABLE personnel ADD COLUMN notes TEXT DEFAULT ''",
+
+                "role":
+                    "ALTER TABLE personnel ADD COLUMN role TEXT DEFAULT ''",
+
+                "department":
+                    "ALTER TABLE personnel ADD COLUMN department TEXT DEFAULT ''",
+
+                "status":
+                    "ALTER TABLE personnel ADD COLUMN status TEXT DEFAULT 'Active'",
+
+                "profile_token":
+                    "ALTER TABLE personnel ADD COLUMN profile_token TEXT",
+
+                "profile_image":
+                    "ALTER TABLE personnel ADD COLUMN profile_image BLOB",
+
+                "profile_image_mime":
+                    "ALTER TABLE personnel ADD COLUMN profile_image_mime TEXT",
             }
 
             for column, sql in migrations.items():
+
                 if column not in columns:
                     cur.execute(sql)
 
             db.commit()
 
         # -------------------------------------------------
-        # Generate missing profile tokens
+        # PROFILE TOKENS
         # -------------------------------------------------
 
-        cur.execute(
-            "SELECT id FROM personnel WHERE profile_token IS NULL OR profile_token = ''"
-        )
+        cur.execute("""
+            SELECT id
+            FROM personnel
+            WHERE profile_token IS NULL
+               OR profile_token = ''
+        """)
 
         rows = cur.fetchall()
 
+        ph = placeholder()
+
         for row in rows:
 
-            person_id = row[0]
+            person_id = row_value(
+                row,
+                "id",
+                0
+            )
 
             token = secrets.token_urlsafe(24)
-
-            ph = placeholder()
 
             cur.execute(
                 f"""
@@ -401,39 +466,60 @@ def init_db():
                 SET profile_token = {ph}
                 WHERE id = {ph}
                 """,
-                (token, person_id),
+                (
+                    token,
+                    person_id
+                )
             )
 
         db.commit()
 
         # -------------------------------------------------
-        # Default admin account
+        # DEFAULT ADMIN
         # -------------------------------------------------
 
         cur.execute(
-            "SELECT id FROM users WHERE username = " + placeholder(),
-            ("admin",),
+            f"""
+            SELECT id
+            FROM users
+            WHERE LOWER(username) = LOWER({ph})
+            """,
+            ("admin",)
         )
 
         admin_exists = cur.fetchone()
 
         if not admin_exists:
 
-            password_hash = generate_password_hash("ChangeMe123!")
+            password_hash = generate_password_hash(
+                "ChangeMe123!"
+            )
 
             cur.execute(
-                """
+                f"""
                 INSERT INTO users
-                (username, password_hash, role)
-                VALUES ({}, {}, 'admin')
-                """.format(placeholder(), placeholder()),
-                ("admin", password_hash),
+                (
+                    username,
+                    password_hash,
+                    role
+                )
+                VALUES (
+                    {ph},
+                    {ph},
+                    {ph}
+                )
+                """,
+                (
+                    "admin",
+                    password_hash,
+                    "admin"
+                )
             )
 
             db.commit()
 
             print(
-                "================================================="
+                "=============================================="
             )
             print(
                 "DEFAULT ADMIN CREATED"
@@ -448,7 +534,7 @@ def init_db():
                 "PLEASE CHANGE THIS PASSWORD"
             )
             print(
-                "================================================="
+                "=============================================="
             )
 
     finally:
@@ -466,7 +552,7 @@ def current_role():
 @app.context_processor
 def inject_globals():
     return {
-        "current_role": current_role(),
+        "current_role": current_role()
     }
 
 
@@ -478,28 +564,28 @@ def login_required(role=None):
         def wrapped(*args, **kwargs):
 
             if "user_id" not in session:
-                next_url = request.path
 
                 return redirect(
                     url_for(
                         "mod_login",
-                        next=next_url
+                        next=request.path
                     )
                 )
 
-            if role:
+            user_role = session.get("role")
 
-                user_role = session.get("role")
+            if role == "moderator":
 
-                if role == "moderator":
+                if user_role not in [
+                    "moderator",
+                    "admin"
+                ]:
+                    abort(403)
 
-                    if user_role not in ["moderator", "admin"]:
-                        abort(403)
+            elif role == "admin":
 
-                elif role == "admin":
-
-                    if user_role != "admin":
-                        abort(403)
+                if user_role != "admin":
+                    abort(403)
 
             return view(*args, **kwargs)
 
@@ -509,22 +595,43 @@ def login_required(role=None):
 
 
 # =========================================================
-# PUBLIC SEARCH
+# PUBLIC HOME / SEARCH
 # =========================================================
 
 @app.route("/")
 def public_home():
 
-    q = request.args.get("q", "").strip()
+    q = request.args.get(
+        "q",
+        ""
+    ).strip()
 
-    selected_role = request.args.get("role", "").strip()
-    selected_department = request.args.get("department", "").strip()
-    selected_rank = request.args.get("rank", "").strip()
-    selected_status = request.args.get("status", "").strip()
+    selected_role = request.args.get(
+        "role",
+        ""
+    ).strip()
+
+    selected_department = request.args.get(
+        "department",
+        ""
+    ).strip()
+
+    selected_rank = request.args.get(
+        "rank",
+        ""
+    ).strip()
+
+    selected_status = request.args.get(
+        "status",
+        ""
+    ).strip()
 
     try:
-        page = max(int(request.args.get("page", 1)), 1)
-    except ValueError:
+        page = max(
+            int(request.args.get("page", 1)),
+            1
+        )
+    except (ValueError, TypeError):
         page = 1
 
     ph = placeholder()
@@ -532,73 +639,127 @@ def public_home():
     conditions = []
     params = []
 
+    # -------------------------------------------------
+    # SEARCH
+    # -------------------------------------------------
+
     if q:
 
+        search = f"%{q}%"
+
         conditions.append(
+            f"""
+            (
+                name ILIKE {ph}
+                OR rank ILIKE {ph}
+                OR role ILIKE {ph}
+                OR department ILIKE {ph}
+                OR status ILIKE {ph}
+            )
+            """
+            if is_postgres()
+            else
             f"""
             (
                 LOWER(name) LIKE LOWER({ph})
                 OR LOWER(rank) LIKE LOWER({ph})
                 OR LOWER(role) LIKE LOWER({ph})
                 OR LOWER(department) LIKE LOWER({ph})
+                OR LOWER(status) LIKE LOWER({ph})
             )
             """
         )
 
-        search_value = f"%{q}%"
-
         params.extend([
-            search_value,
-            search_value,
-            search_value,
-            search_value,
+            search,
+            search,
+            search,
+            search,
+            search,
         ])
+
+    # -------------------------------------------------
+    # FILTERS
+    # -------------------------------------------------
 
     if selected_role:
 
-        conditions.append(f"role = {ph}")
+        conditions.append(
+            f"role = {ph}"
+        )
 
-        params.append(selected_role)
+        params.append(
+            selected_role
+        )
 
     if selected_department:
 
-        conditions.append(f"department = {ph}")
+        conditions.append(
+            f"department = {ph}"
+        )
 
-        params.append(selected_department)
+        params.append(
+            selected_department
+        )
 
     if selected_rank:
 
-        conditions.append(f"rank = {ph}")
+        conditions.append(
+            f"rank = {ph}"
+        )
 
-        params.append(selected_rank)
+        params.append(
+            selected_rank
+        )
 
     if selected_status:
 
-        conditions.append(f"status = {ph}")
+        conditions.append(
+            f"status = {ph}"
+        )
 
-        params.append(selected_status)
+        params.append(
+            selected_status
+        )
 
     where = ""
 
     if conditions:
-        where = " WHERE " + " AND ".join(conditions)
 
-    total_query = f"""
-        SELECT COUNT(*)
-        FROM personnel
-        {where}
-    """
+        where = (
+            " WHERE "
+            + " AND ".join(conditions)
+        )
+
+    # -------------------------------------------------
+    # TOTAL
+    # -------------------------------------------------
 
     total_row = execute(
-        total_query,
+        f"""
+        SELECT COUNT(*) AS total
+        FROM personnel
+        {where}
+        """,
         tuple(params),
         fetchone=True
     )
 
-    total = total_row[0] if total_row else 0
+    total = row_value(
+        total_row,
+        "total",
+        0,
+        0
+    )
+
+    total = int(total or 0)
 
     total_pages = max(
-        (total + PERSONNEL_PER_PAGE - 1)
+        (
+            total
+            + PERSONNEL_PER_PAGE
+            - 1
+        )
         // PERSONNEL_PER_PAGE,
         1
     )
@@ -606,9 +767,16 @@ def public_home():
     if page > total_pages:
         page = total_pages
 
-    offset = (page - 1) * PERSONNEL_PER_PAGE
+    offset = (
+        page - 1
+    ) * PERSONNEL_PER_PAGE
 
-    query = f"""
+    # -------------------------------------------------
+    # RESULTS
+    # -------------------------------------------------
+
+    people = execute(
+        f"""
         SELECT
             id,
             name,
@@ -623,19 +791,16 @@ def public_home():
         FROM personnel
         {where}
         ORDER BY LOWER(name)
-        LIMIT {ph} OFFSET {ph}
-    """
-
-    final_params = list(params)
-
-    final_params.extend([
-        PERSONNEL_PER_PAGE,
-        offset
-    ])
-
-    people = execute(
-        query,
-        tuple(final_params),
+        LIMIT {ph}
+        OFFSET {ph}
+        """,
+        tuple(
+            params
+            + [
+                PERSONNEL_PER_PAGE,
+                offset
+            ]
+        ),
         fetchall=True
     )
 
@@ -661,7 +826,9 @@ def public_home():
 # PUBLIC PERSONNEL PROFILE
 # =========================================================
 
-@app.route("/personnel/<int:person_id>")
+@app.route(
+    "/personnel/<int:person_id>"
+)
 def public_person(person_id):
 
     ph = placeholder()
@@ -682,7 +849,9 @@ def public_person(person_id):
         FROM personnel
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchone=True
     )
 
@@ -704,14 +873,16 @@ def public_person(person_id):
         WHERE personnel_id = {ph}
         ORDER BY created_at DESC
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchall=True
     )
 
     return render_template(
         "public_person.html",
         person=person,
-        criminal_records=criminal_records,
+        criminal_records=criminal_records
     )
 
 
@@ -719,7 +890,9 @@ def public_person(person_id):
 # PROFILE IMAGE
 # =========================================================
 
-@app.route("/profile-image/<int:person_id>")
+@app.route(
+    "/profile-image/<int:person_id>"
+)
 def profile_image(person_id):
 
     ph = placeholder()
@@ -732,23 +905,41 @@ def profile_image(person_id):
         FROM personnel
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchone=True
     )
 
-    if not row or not row[0]:
+    image_data = row_value(
+        row,
+        "profile_image",
+        0
+    )
 
-        # Return a transparent 1x1 image if no profile image exists
+    image_mime = row_value(
+        row,
+        "profile_image_mime",
+        1,
+        "image/png"
+    )
+
+    if not image_data:
+
+        # 1x1 transparent PNG
         empty_png = (
             b"\x89PNG\r\n\x1a\n"
             b"\x00\x00\x00\rIHDR"
-            b"\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01"
             b"\x08\x06\x00\x00\x00"
             b"\x1f\x15\xc4\x89"
             b"\x00\x00\x00\rIDAT"
-            b"\x08\xd7c\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00"
+            b"\x08\xd7c\xf8\xcf\xc0\x00"
+            b"\x00\x03\x01\x01\x00"
             b"\x18\xdd\x8d\xb1"
-            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+            b"\x00\x00\x00\x00"
+            b"IEND\xaeB`\x82"
         )
 
         return send_file(
@@ -757,24 +948,38 @@ def profile_image(person_id):
         )
 
     return send_file(
-        BytesIO(row[0]),
-        mimetype=row[1] or "image/png"
+        BytesIO(bytes(image_data)),
+        mimetype=image_mime or "image/png"
     )
 
 
 # =========================================================
-# MODERATOR LOGIN
+# LOGIN
 # =========================================================
 
-@app.route("/mod/login", methods=["GET", "POST"])
+@app.route(
+    "/mod/login",
+    methods=["GET", "POST"]
+)
 def mod_login():
 
-    next_url = request.args.get("next") or request.form.get("next")
+    next_url = (
+        request.args.get("next")
+        or request.form.get("next")
+        or ""
+    )
 
     if request.method == "POST":
 
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        username = request.form.get(
+            "username",
+            ""
+        ).strip()
+
+        password = request.form.get(
+            "password",
+            ""
+        )
 
         if not username or not password:
 
@@ -800,25 +1005,60 @@ def mod_login():
             FROM users
             WHERE LOWER(username) = LOWER({ph})
             """,
-            (username,),
+            (
+                username,
+            ),
             fetchone=True
         )
 
-        if user and check_password_hash(
-            user[2],
-            password
+        user_id = row_value(
+            user,
+            "id",
+            0
+        )
+
+        stored_username = row_value(
+            user,
+            "username",
+            1
+        )
+
+        password_hash = row_value(
+            user,
+            "password_hash",
+            2
+        )
+
+        user_role = row_value(
+            user,
+            "role",
+            3
+        )
+
+        if (
+            user
+            and password_hash
+            and check_password_hash(
+                password_hash,
+                password
+            )
         ):
 
             session.clear()
 
-            session["user_id"] = user[0]
-            session["username"] = user[1]
-            session["role"] = user[3]
+            session["user_id"] = user_id
+            session["username"] = stored_username
+            session["role"] = user_role
 
-            if next_url and next_url.startswith("/"):
+            if (
+                next_url
+                and next_url.startswith("/")
+            ):
                 return redirect(next_url)
 
-            return redirect(url_for("mod_home"))
+            return redirect(
+                url_for("mod_home")
+            )
 
         flash(
             "Invalid username or password.",
@@ -835,7 +1075,9 @@ def mod_login():
 # LOGOUT
 # =========================================================
 
-@app.route("/mod/logout")
+@app.route(
+    "/mod/logout"
+)
 def logout():
 
     session.clear()
@@ -878,7 +1120,7 @@ def mod_home():
         roles=ROLES,
         departments=DEPARTMENTS,
         ranks=RANKS,
-        statuses=STATUSES,
+        statuses=STATUSES
     )
 
 
@@ -886,16 +1128,42 @@ def mod_home():
 # ADD PERSONNEL
 # =========================================================
 
-@app.route("/mod/personnel/add", methods=["POST"])
+@app.route(
+    "/mod/personnel/add",
+    methods=["POST"]
+)
 @login_required("moderator")
 def add_personnel():
 
-    name = request.form.get("name", "").strip()
-    rank = request.form.get("rank", "None").strip()
-    role = request.form.get("role", "").strip()
-    department = request.form.get("department", "").strip()
-    status = request.form.get("status", "Active").strip()
-    notes = request.form.get("notes", "").strip()
+    name = request.form.get(
+        "name",
+        ""
+    ).strip()
+
+    rank = request.form.get(
+        "rank",
+        "None"
+    ).strip()
+
+    role = request.form.get(
+        "role",
+        ""
+    ).strip()
+
+    department = request.form.get(
+        "department",
+        ""
+    ).strip()
+
+    status = request.form.get(
+        "status",
+        "Active"
+    ).strip()
+
+    notes = request.form.get(
+        "notes",
+        ""
+    ).strip()
 
     if not name:
 
@@ -904,98 +1172,64 @@ def add_personnel():
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     profile_token = secrets.token_urlsafe(24)
 
     ph = placeholder()
 
-    if is_postgres():
-
-        execute(
-            f"""
-            INSERT INTO personnel
-            (
-                name,
-                rank,
-                points,
-                notes,
-                role,
-                department,
-                status,
-                profile_token
-            )
-            VALUES (
-                {ph},
-                {ph},
-                0,
-                {ph},
-                {ph},
-                {ph},
-                {ph},
-                {ph}
-            )
-            """,
-            (
-                name,
-                rank,
-                notes,
-                role,
-                department,
-                status,
-                profile_token,
-            ),
-            commit=True
+    execute(
+        f"""
+        INSERT INTO personnel
+        (
+            name,
+            rank,
+            points,
+            notes,
+            role,
+            department,
+            status,
+            profile_token
         )
-
-    else:
-
-        execute(
-            f"""
-            INSERT INTO personnel
-            (
-                name,
-                rank,
-                points,
-                notes,
-                role,
-                department,
-                status,
-                profile_token
-            )
-            VALUES (
-                {ph},
-                {ph},
-                0,
-                {ph},
-                {ph},
-                {ph},
-                {ph},
-                {ph}
-            )
-            """,
-            (
-                name,
-                rank,
-                notes,
-                role,
-                department,
-                status,
-                profile_token,
-            ),
-            commit=True
+        VALUES
+        (
+            {ph},
+            {ph},
+            {ph},
+            {ph},
+            {ph},
+            {ph},
+            {ph},
+            {ph}
         )
+        """,
+        (
+            name,
+            rank,
+            0,
+            notes,
+            role,
+            department,
+            status,
+            profile_token
+        ),
+        commit=True
+    )
 
     flash(
         f"{name} was added successfully.",
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
-# UPDATE PERSONNEL INFORMATION
+# UPDATE PERSONNEL
 # =========================================================
 
 @app.route(
@@ -1005,12 +1239,35 @@ def add_personnel():
 @login_required("moderator")
 def update_personnel(person_id):
 
-    name = request.form.get("name", "").strip()
-    rank = request.form.get("rank", "None").strip()
-    role = request.form.get("role", "").strip()
-    department = request.form.get("department", "").strip()
-    status = request.form.get("status", "Active").strip()
-    notes = request.form.get("notes", "").strip()
+    name = request.form.get(
+        "name",
+        ""
+    ).strip()
+
+    rank = request.form.get(
+        "rank",
+        "None"
+    ).strip()
+
+    role = request.form.get(
+        "role",
+        ""
+    ).strip()
+
+    department = request.form.get(
+        "department",
+        ""
+    ).strip()
+
+    status = request.form.get(
+        "status",
+        "Active"
+    ).strip()
+
+    notes = request.form.get(
+        "notes",
+        ""
+    ).strip()
 
     if not name:
 
@@ -1019,7 +1276,9 @@ def update_personnel(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     ph = placeholder()
 
@@ -1042,7 +1301,7 @@ def update_personnel(person_id):
             department,
             status,
             notes,
-            person_id,
+            person_id
         ),
         commit=True
     )
@@ -1052,7 +1311,9 @@ def update_personnel(person_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
@@ -1069,17 +1330,22 @@ def update_points(person_id):
     try:
 
         amount = int(
-            request.form.get("amount", "0")
+            request.form.get(
+                "amount",
+                "0"
+            )
         )
 
-    except ValueError:
+    except (ValueError, TypeError):
 
         flash(
             "Points must be a number.",
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     reason = request.form.get(
         "reason",
@@ -1093,33 +1359,54 @@ def update_points(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     ph = placeholder()
 
     person = execute(
         f"""
-        SELECT name, points
+        SELECT
+            name,
+            points
         FROM personnel
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchone=True
     )
 
     if not person:
-
         abort(404)
 
-    old_points = int(person[1] or 0)
+    person_name = row_value(
+        person,
+        "name",
+        0,
+        "Unknown"
+    )
 
-    new_points = old_points + amount
+    old_points = int(
+        row_value(
+            person,
+            "points",
+            1,
+            0
+        ) or 0
+    )
 
-    # Prevent negative points
-    if new_points < 0:
-        new_points = 0
+    new_points = max(
+        old_points + amount,
+        0
+    )
 
-    actual_change = new_points - old_points
+    actual_change = (
+        new_points
+        - old_points
+    )
 
     execute(
         f"""
@@ -1129,7 +1416,7 @@ def update_points(person_id):
         """,
         (
             new_points,
-            person_id,
+            person_id
         ),
         commit=True
     )
@@ -1143,7 +1430,8 @@ def update_points(person_id):
             reason,
             changed_by
         )
-        VALUES (
+        VALUES
+        (
             {ph},
             {ph},
             {ph},
@@ -1157,17 +1445,19 @@ def update_points(person_id):
             session.get(
                 "username",
                 "Unknown"
-            ),
+            )
         ),
         commit=True
     )
 
     flash(
-        f"Points updated for {person[0]}.",
+        f"Points updated for {person_name}.",
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
@@ -1184,11 +1474,16 @@ def point_history(person_id):
 
     person = execute(
         f"""
-        SELECT id, name, points
+        SELECT
+            id,
+            name,
+            points
         FROM personnel
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchone=True
     )
 
@@ -1207,7 +1502,9 @@ def point_history(person_id):
         WHERE personnel_id = {ph}
         ORDER BY created_at DESC
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         fetchall=True
     )
 
@@ -1219,7 +1516,7 @@ def point_history(person_id):
 
 
 # =========================================================
-# PROFILE IMAGE UPLOAD
+# UPLOAD PROFILE IMAGE
 # =========================================================
 
 @app.route(
@@ -1229,7 +1526,9 @@ def point_history(person_id):
 @login_required("moderator")
 def upload_profile_image(person_id):
 
-    file = request.files.get("profile_image")
+    file = request.files.get(
+        "profile_image"
+    )
 
     if not file or not file.filename:
 
@@ -1238,7 +1537,9 @@ def upload_profile_image(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     data = file.read()
 
@@ -1249,22 +1550,29 @@ def upload_profile_image(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     try:
 
-        image = Image.open(BytesIO(data))
+        image = Image.open(
+            BytesIO(data)
+        )
 
-        # Verify image
         image.verify()
 
-        image = Image.open(BytesIO(data))
+        image = Image.open(
+            BytesIO(data)
+        )
 
         if image.mode not in (
             "RGB",
             "RGBA"
         ):
-            image = image.convert("RGBA")
+            image = image.convert(
+                "RGBA"
+            )
 
         output = BytesIO()
 
@@ -1275,8 +1583,6 @@ def upload_profile_image(person_id):
 
         image_data = output.getvalue()
 
-        mime = "image/png"
-
     except Exception:
 
         flash(
@@ -1284,7 +1590,9 @@ def upload_profile_image(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     ph = placeholder()
 
@@ -1298,8 +1606,8 @@ def upload_profile_image(person_id):
         """,
         (
             image_data,
-            mime,
-            person_id,
+            "image/png",
+            person_id
         ),
         commit=True
     )
@@ -1309,7 +1617,9 @@ def upload_profile_image(person_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
@@ -1333,7 +1643,9 @@ def remove_profile_image(person_id):
             profile_image_mime = NULL
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         commit=True
     )
 
@@ -1342,11 +1654,13 @@ def remove_profile_image(person_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
-# ADD CRIMINAL RECORD
+# CRIMINAL RECORD
 # =========================================================
 
 @app.route(
@@ -1388,7 +1702,9 @@ def add_criminal_record(person_id):
             "error"
         )
 
-        return redirect(url_for("mod_home"))
+        return redirect(
+            url_for("mod_home")
+        )
 
     ph = placeholder()
 
@@ -1404,7 +1720,8 @@ def add_criminal_record(person_id):
             case_date,
             created_by
         )
-        VALUES (
+        VALUES
+        (
             {ph},
             {ph},
             {ph},
@@ -1424,7 +1741,7 @@ def add_criminal_record(person_id):
             session.get(
                 "username",
                 "Unknown"
-            ),
+            )
         ),
         commit=True
     )
@@ -1434,12 +1751,10 @@ def add_criminal_record(person_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
-
-# =========================================================
-# DELETE CRIMINAL RECORD
-# =========================================================
 
 @app.route(
     "/mod/criminal-record/<int:record_id>/delete",
@@ -1455,7 +1770,9 @@ def delete_criminal_record(record_id):
         DELETE FROM criminal_records
         WHERE id = {ph}
         """,
-        (record_id,),
+        (
+            record_id,
+        ),
         commit=True
     )
 
@@ -1464,7 +1781,9 @@ def delete_criminal_record(record_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
@@ -1480,13 +1799,14 @@ def delete_personnel(person_id):
 
     ph = placeholder()
 
-    # Remove associated records first
     execute(
         f"""
         DELETE FROM point_log
         WHERE personnel_id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         commit=True
     )
 
@@ -1495,7 +1815,9 @@ def delete_personnel(person_id):
         DELETE FROM criminal_records
         WHERE personnel_id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         commit=True
     )
 
@@ -1504,7 +1826,9 @@ def delete_personnel(person_id):
         DELETE FROM personnel
         WHERE id = {ph}
         """,
-        (person_id,),
+        (
+            person_id,
+        ),
         commit=True
     )
 
@@ -1513,11 +1837,13 @@ def delete_personnel(person_id):
         "success"
     )
 
-    return redirect(url_for("mod_home"))
+    return redirect(
+        url_for("mod_home")
+    )
 
 
 # =========================================================
-# ADMIN DASHBOARD
+# ADMIN
 # =========================================================
 
 @app.route("/admin")
@@ -1562,12 +1888,12 @@ def admin_home():
         roles=ROLES,
         departments=DEPARTMENTS,
         ranks=RANKS,
-        statuses=STATUSES,
+        statuses=STATUSES
     )
 
 
 # =========================================================
-# CREATE STAFF ACCOUNT
+# CREATE STAFF
 # =========================================================
 
 @app.route(
@@ -1592,10 +1918,10 @@ def create_staff():
         "moderator"
     ).strip()
 
-    if role not in [
+    if role not in (
         "moderator",
         "admin"
-    ]:
+    ):
         role = "moderator"
 
     if not username or not password:
@@ -1605,7 +1931,9 @@ def create_staff():
             "error"
         )
 
-        return redirect(url_for("admin_home"))
+        return redirect(
+            url_for("admin_home")
+        )
 
     ph = placeholder()
 
@@ -1615,7 +1943,9 @@ def create_staff():
         FROM users
         WHERE LOWER(username) = LOWER({ph})
         """,
-        (username,),
+        (
+            username,
+        ),
         fetchone=True
     )
 
@@ -1626,7 +1956,9 @@ def create_staff():
             "error"
         )
 
-        return redirect(url_for("admin_home"))
+        return redirect(
+            url_for("admin_home")
+        )
 
     password_hash = generate_password_hash(
         password
@@ -1640,7 +1972,8 @@ def create_staff():
             password_hash,
             role
         )
-        VALUES (
+        VALUES
+        (
             {ph},
             {ph},
             {ph}
@@ -1649,7 +1982,7 @@ def create_staff():
         (
             username,
             password_hash,
-            role,
+            role
         ),
         commit=True
     )
@@ -1659,11 +1992,13 @@ def create_staff():
         "success"
     )
 
-    return redirect(url_for("admin_home"))
+    return redirect(
+        url_for("admin_home")
+    )
 
 
 # =========================================================
-# DELETE STAFF ACCOUNT
+# DELETE STAFF
 # =========================================================
 
 @app.route(
@@ -1681,15 +2016,22 @@ def delete_staff(user_id):
         FROM users
         WHERE id = {ph}
         """,
-        (user_id,),
+        (
+            user_id,
+        ),
         fetchone=True
     )
 
     if not user:
-
         abort(404)
 
-    # Prevent deleting currently logged in account
+    target_username = row_value(
+        user,
+        "username",
+        0,
+        ""
+    )
+
     if session.get("user_id") == user_id:
 
         flash(
@@ -1697,23 +2039,29 @@ def delete_staff(user_id):
             "error"
         )
 
-        return redirect(url_for("admin_home"))
+        return redirect(
+            url_for("admin_home")
+        )
 
     execute(
         f"""
         DELETE FROM users
         WHERE id = {ph}
         """,
-        (user_id,),
+        (
+            user_id,
+        ),
         commit=True
     )
 
     flash(
-        f"Staff account '{user[0]}' deleted.",
+        f"Staff account '{target_username}' deleted.",
         "success"
     )
 
-    return redirect(url_for("admin_home"))
+    return redirect(
+        url_for("admin_home")
+    )
 
 
 # =========================================================
@@ -1732,17 +2080,19 @@ def update_staff_role(user_id):
         "moderator"
     ).strip()
 
-    if role not in [
+    if role not in (
         "moderator",
         "admin"
-    ]:
+    ):
 
         flash(
             "Invalid staff role.",
             "error"
         )
 
-        return redirect(url_for("admin_home"))
+        return redirect(
+            url_for("admin_home")
+        )
 
     ph = placeholder()
 
@@ -1754,7 +2104,7 @@ def update_staff_role(user_id):
         """,
         (
             role,
-            user_id,
+            user_id
         ),
         commit=True
     )
@@ -1764,14 +2114,18 @@ def update_staff_role(user_id):
         "success"
     )
 
-    return redirect(url_for("admin_home"))
+    return redirect(
+        url_for("admin_home")
+    )
 
 
 # =========================================================
 # API SEARCH
 # =========================================================
 
-@app.route("/api/search")
+@app.route(
+    "/api/search"
+)
 def api_search():
 
     q = request.args.get(
@@ -1786,23 +2140,36 @@ def api_search():
 
     if q:
 
-        search_value = f"%{q}%"
+        search = f"%{q}%"
 
-        where = f"""
-            WHERE
-                LOWER(name) LIKE LOWER({ph})
-                OR LOWER(rank) LIKE LOWER({ph})
-                OR LOWER(role) LIKE LOWER({ph})
-                OR LOWER(department) LIKE LOWER({ph})
-                OR LOWER(status) LIKE LOWER({ph})
-        """
+        if is_postgres():
+
+            where = f"""
+                WHERE
+                    name ILIKE {ph}
+                    OR rank ILIKE {ph}
+                    OR role ILIKE {ph}
+                    OR department ILIKE {ph}
+                    OR status ILIKE {ph}
+            """
+
+        else:
+
+            where = f"""
+                WHERE
+                    LOWER(name) LIKE LOWER({ph})
+                    OR LOWER(rank) LIKE LOWER({ph})
+                    OR LOWER(role) LIKE LOWER({ph})
+                    OR LOWER(department) LIKE LOWER({ph})
+                    OR LOWER(status) LIKE LOWER({ph})
+            """
 
         params = [
-            search_value,
-            search_value,
-            search_value,
-            search_value,
-            search_value,
+            search,
+            search,
+            search,
+            search,
+            search
         ]
 
     rows = execute(
@@ -1830,24 +2197,24 @@ def api_search():
     for row in rows:
 
         results.append({
-            "id": row[0],
-            "name": row[1],
-            "rank": row[2],
-            "points": row[3],
-            "role": row[4],
-            "department": row[5],
-            "status": row[6],
-            "profile_token": row[7],
+            "id": row_value(row, "id", 0),
+            "name": row_value(row, "name", 1),
+            "rank": row_value(row, "rank", 2),
+            "points": row_value(row, "points", 3, 0),
+            "role": row_value(row, "role", 4),
+            "department": row_value(row, "department", 5),
+            "status": row_value(row, "status", 6),
+            "profile_token": row_value(row, "profile_token", 7),
         })
 
     return {
         "results": results,
-        "count": len(results),
+        "count": len(results)
     }
 
 
 # =========================================================
-# ERROR HANDLERS
+# ERRORS
 # =========================================================
 
 @app.errorhandler(403)
@@ -1873,6 +2240,24 @@ def not_found(error):
             error_message="The requested page could not be found."
         ),
         404
+    )
+
+
+@app.errorhandler(500)
+def internal_error(error):
+
+    print(
+        "INTERNAL SERVER ERROR:",
+        repr(error)
+    )
+
+    return (
+        render_template(
+            "error.html",
+            error_code=500,
+            error_message="An internal server error occurred."
+        ),
+        500
     )
 
 

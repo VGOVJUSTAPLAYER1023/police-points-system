@@ -18,7 +18,8 @@ Moderator Panel · Philippine Pampanga Roleplay
     </h1>
 
     <p>
-        Signed in as <strong>{{ current_user }}</strong>.
+        Signed in as
+        <strong>{{ session.get("username", "Unknown") }}</strong>.
         Manage personnel records, profile pictures, ranks, roles,
         statuses, points, and criminal records.
     </p>
@@ -335,6 +336,36 @@ Moderator Panel · Philippine Pampanga Roleplay
                     class="management-form"
                 >
 
+                    <input
+                        type="hidden"
+                        name="name"
+                        value="{{ p.name }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="role"
+                        value="{{ p.role }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="department"
+                        value="{{ p.department }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="status"
+                        value="{{ p.status }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="notes"
+                        value="{{ p.notes or '' }}"
+                    >
+
                     <label>
                         Rank
 
@@ -357,7 +388,10 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Update Rank
                     </button>
 
@@ -372,6 +406,36 @@ Moderator Panel · Philippine Pampanga Roleplay
                     action="{{ url_for('update_personnel', person_id=p.id) }}"
                     class="management-form"
                 >
+
+                    <input
+                        type="hidden"
+                        name="name"
+                        value="{{ p.name }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="rank"
+                        value="{{ p.rank }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="department"
+                        value="{{ p.department }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="status"
+                        value="{{ p.status }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="notes"
+                        value="{{ p.notes or '' }}"
+                    >
 
                     <label>
                         Role
@@ -395,7 +459,10 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Update Role
                     </button>
 
@@ -407,9 +474,39 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                 <form
                     method="post"
-                    action="{{ url_for('update_department', person_id=p.id) }}"
+                    action="{{ url_for('update_personnel', person_id=p.id) }}"
                     class="management-form"
                 >
+
+                    <input
+                        type="hidden"
+                        name="name"
+                        value="{{ p.name }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="rank"
+                        value="{{ p.rank }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="role"
+                        value="{{ p.role }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="status"
+                        value="{{ p.status }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="notes"
+                        value="{{ p.notes or '' }}"
+                    >
 
                     <label>
                         Department
@@ -433,7 +530,10 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Update Department
                     </button>
 
@@ -445,9 +545,39 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                 <form
                     method="post"
-                    action="{{ url_for('update_status', person_id=p.id) }}"
+                    action="{{ url_for('update_personnel', person_id=p.id) }}"
                     class="management-form"
                 >
+
+                    <input
+                        type="hidden"
+                        name="name"
+                        value="{{ p.name }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="rank"
+                        value="{{ p.rank }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="role"
+                        value="{{ p.role }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="department"
+                        value="{{ p.department }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="notes"
+                        value="{{ p.notes or '' }}"
+                    >
 
                     <label>
                         Status
@@ -471,7 +601,10 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                     </label>
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Update Status
                     </button>
 
@@ -504,19 +637,22 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                 <form
                     method="post"
-                    action="{{ url_for('upload_profile_picture', person_id=p.id) }}"
+                    action="{{ url_for('upload_profile_image', person_id=p.id) }}"
                     enctype="multipart/form-data"
                     class="profile-upload"
                 >
 
                     <input
                         type="file"
-                        name="photo"
+                        name="profile_image"
                         accept="image/png,image/jpeg,image/webp"
                         required
                     >
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Upload PFP
                     </button>
 
@@ -525,11 +661,14 @@ Moderator Panel · Philippine Pampanga Roleplay
 
                 <form
                     method="post"
-                    action="{{ url_for('remove_profile_picture', person_id=p.id) }}"
+                    action="{{ url_for('remove_profile_image', person_id=p.id) }}"
                     onsubmit="return confirm('Remove this profile picture?')"
                 >
 
-                    <button class="danger">
+                    <button
+                        type="submit"
+                        class="danger"
+                    >
                         Remove PFP
                     </button>
 
@@ -581,7 +720,10 @@ Moderator Panel · Philippine Pampanga Roleplay
                     >
 
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Apply Points
                     </button>
 
@@ -662,7 +804,10 @@ Moderator Panel · Philippine Pampanga Roleplay
                     </select>
 
 
-                    <button class="mini">
+                    <button
+                        type="submit"
+                        class="mini"
+                    >
                         Add Record
                     </button>
 
@@ -680,7 +825,7 @@ Moderator Panel · Philippine Pampanga Roleplay
 
 
                 <a
-                    href="{{ url_for('public_personnel', person_id=p.id) }}"
+                    href="{{ url_for('public_person', person_id=p.id) }}"
                     class="mini link"
                     target="_blank"
                 >
@@ -698,7 +843,10 @@ Moderator Panel · Philippine Pampanga Roleplay
                     "
                 >
 
-                    <button class="danger">
+                    <button
+                        type="submit"
+                        class="danger"
+                    >
                         Delete Personnel
                     </button>
 

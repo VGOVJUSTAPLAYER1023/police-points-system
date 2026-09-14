@@ -1,0 +1,864 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ person.name }} · Philippine Pampanga Roleplay
+{% endblock %}
+
+
+{% block content %}
+
+<a
+    href="{{ url_for('public_home') }}"
+    class="back"
+>
+    ← Back to Search
+</a>
+
+
+<!-- PROFILE HEADER -->
+<section class="profile-card">
+
+    <!-- PROFILE PICTURE -->
+
+    <div class="profile-picture-container">
+
+        <img
+            src="{{ url_for('profile_image', person_id=person.id) }}"
+            alt="{{ person.name }} profile picture"
+            class="profile-picture"
+            onerror="
+                this.style.display='none';
+                this.nextElementSibling.style.display='flex';
+            "
+        >
+
+        <div
+            class="profile-picture-placeholder"
+            style="display:none;"
+        >
+            {{ person.name[:1]|upper }}
+        </div>
+
+    </div>
+
+
+    <!-- BASIC INFORMATION -->
+
+    <div class="profile-main">
+
+        <div class="eyebrow">
+            PERSONNEL RECORD
+        </div>
+
+
+        <h1 class="profile-name">
+            {{ person.name }}
+        </h1>
+
+
+        <div class="profile-rank">
+            {{ person.rank }}
+        </div>
+
+
+        <!-- STATUS -->
+
+        <div class="profile-status">
+
+            {% if person.status == "Active" %}
+
+                <span class="status-badge status-active">
+                    🟢 Active
+                </span>
+
+            {% elif person.status == "LOA" %}
+
+                <span class="status-badge status-loa">
+                    🔴 LOA
+                </span>
+
+            {% elif person.status == "Suspended" %}
+
+                <span class="status-badge status-suspended">
+                    🟡 Suspended
+                </span>
+
+            {% elif person.status == "Retired" %}
+
+                <span class="status-badge status-retired">
+                    ⚫ Retired
+                </span>
+
+            {% elif person.status == "Training" %}
+
+                <span class="status-badge status-training">
+                    🔵 Training
+                </span>
+
+            {% else %}
+
+                <span class="status-badge">
+                    ⚪ {{ person.status }}
+                </span>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- POINTS -->
+
+    <div class="profile-points">
+
+        <span>
+            POINTS
+        </span>
+
+        <strong>
+            {{ person.points }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- PERSONNEL INFORMATION -->
+
+<section class="profile-information">
+
+    <div class="information-item">
+
+        <span class="information-label">
+            ROLE
+        </span>
+
+        <strong>
+            {{ person.role }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            DEPARTMENT
+        </span>
+
+        <strong>
+            {{ person.department }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            RANK
+        </span>
+
+        <strong>
+            {{ person.rank }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            STATUS
+        </span>
+
+        <strong>
+            {{ person.status }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- CRIMINAL RECORDS -->
+
+<section class="profile-section">
+
+    <div class="section-heading">
+
+        <div>
+            <div class="eyebrow">
+                RECORDS
+            </div>
+
+            <h2>
+                Criminal Records
+            </h2>
+        </div>
+
+    </div>
+
+
+    {% if criminal_records %}
+
+        <div class="criminal-records">
+
+            {% for record in criminal_records %}
+
+            <div class="criminal-record">
+
+                <div class="criminal-record-header">
+
+                    <div>
+
+                        {% if record.case_number %}
+
+                        <span class="case-number">
+                            Case #{{ record.case_number }}
+                        </span>
+
+                        {% else %}
+
+                        <span class="case-number">
+                            Criminal Record
+                        </span>
+
+                        {% endif %}
+
+                        <h3>
+                            {{ record.charge }}
+                        </h3>
+
+                    </div>
+
+
+                    <span
+                        class="
+                        record-status
+                        {% if record.record_status|lower == 'open' %}
+                        record-open
+                        {% elif record.record_status|lower == 'closed' %}
+                        record-closed
+                        {% else %}
+                        record-other
+                        {% endif %}
+                        "
+                    >
+
+                        {{ record.record_status }}
+
+                    </span>
+
+                </div>
+
+
+                {% if record.description %}
+
+                <p class="criminal-description">
+                    {{ record.description }}
+                </p>
+
+                {% endif %}
+
+
+                <div class="criminal-meta">
+
+                    {% if record.case_date %}
+
+                    <span>
+                        Date: {{ record.case_date }}
+                    </span>
+
+                    {% endif %}
+
+
+                    <span>
+                        Recorded by: {{ record.created_by }}
+                    </span>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records">
+
+            <div class="no-record-icon">
+                ✓
+            </div>
+
+            <div>
+
+                <strong>
+                    No Criminal Records
+                </strong>
+
+                <span>
+                    No criminal records are currently listed for this personnel.
+                </span>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- POINT HISTORY -->
+
+<section class="profile-section points-history-section" style="position:relative; overflow:hidden;">
+
+    <div class="section-heading" style="align-items:flex-end; gap:16px; margin-bottom:20px;">
+        <div>
+            <div class="eyebrow">
+                POINTS
+            </div>
+
+            <h2 style="margin-bottom:6px;">
+                Points History
+            </h2>
+
+            <span style="display:block; color:#64748b; font-size:14px;">
+                A transparent record of every point change
+            </span>
+        </div>
+
+        <div style="min-width:118px; padding:12px 16px; border:1px solid #dbe4ee; border-radius:14px; background:linear-gradient(180deg,#f8fbff 0%,#eef5fb 100%); text-align:right;">
+            <span style="display:block; font-size:11px; letter-spacing:.12em; font-weight:800; color:#64748b; text-transform:uppercase;">Current</span>
+            <strong style="display:block; margin-top:2px; font-size:24px; line-height:1; color:#0f172a;">{{ person.points }}</strong>
+            <span style="display:block; margin-top:4px; font-size:12px; color:#64748b;">points</span>
+        </div>
+    </div>
+
+    {% if point_logs %}
+
+        <div class="point-history" style="display:flex; flex-direction:column; gap:12px;">
+
+            {% for log in point_logs %}
+
+            <article class="point-history-item" style="position:relative; padding:17px 18px 16px 20px; border:1px solid #e2e8f0; border-radius:15px; background:#fff; box-shadow:0 4px 14px rgba(15,23,42,.04); overflow:hidden;">
+
+                <div style="position:absolute; left:0; top:0; bottom:0; width:4px; background:{% if log.amount > 0 %}#16a34a{% elif log.amount < 0 %}#dc2626{% else %}#94a3b8{% endif %};"></div>
+
+                <div class="point-history-header" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span class="point-history-amount" style="display:inline-flex; align-items:center; min-height:34px; padding:7px 11px; border-radius:999px; font-weight:800; font-size:14px; line-height:1; {% if log.amount > 0 %}background:#ecfdf3; color:#15803d;{% elif log.amount < 0 %}background:#fef2f2; color:#b91c1c;{% else %}background:#f1f5f9; color:#475569;{% endif %}">
+                            {% if log.amount > 0 %}+{{ log.amount }}{% else %}{{ log.amount }}{% endif %} points
+                        </span>
+
+                        <span style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; {% if log.amount > 0 %}color:#16a34a;{% elif log.amount < 0 %}color:#dc2626;{% else %}color:#64748b;{% endif %}">
+                            {% if log.amount > 0 %}Added{% elif log.amount < 0 %}Deducted{% else %}Adjusted{% endif %}
+                        </span>
+                    </div>
+
+                    <span class="point-history-date" style="font-size:12px; color:#64748b; white-space:nowrap;">
+                        {{ log.created_at }}
+                    </span>
+
+                </div>
+
+                <div class="point-history-reason" style="margin-top:13px; padding:12px 13px; border-radius:11px; background:#f8fafc; color:#334155; line-height:1.6;">
+                    <span style="display:block; margin-bottom:3px; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#64748b;">Reason</span>
+                    <div style="font-size:14px;">{{ log.reason }}</div>
+                </div>
+
+                <div class="point-history-by" style="display:flex; align-items:center; gap:7px; margin-top:12px; color:#64748b; font-size:13px;">
+                    <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:#eef2ff; color:#334155; font-weight:800; font-size:11px;">
+                        {{ log.changed_by[:1]|upper if log.changed_by else '?' }}
+                    </span>
+                    <span>
+                        Added by <strong style="color:#334155;">{{ log.changed_by }}</strong>
+                    </span>
+                </div>
+
+            </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records" style="border:1px dashed #cbd5e1; border-radius:15px; background:#f8fafc; padding:24px;">
+            <div class="no-record-icon" style="margin-bottom:8px;">
+                —
+            </div>
+
+            <div>
+                <strong>
+                    No Point History
+                </strong>
+
+                <span>
+                    No point changes have been recorded for this personnel.
+                </span>
+            </div>
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- ADDITIONAL INFORMATION -->
+
+{% if person.notes %}
+
+<section class="profile-section" style="position:relative; overflow:hidden;">
+
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:16px; flex-wrap:wrap;">
+        <div>
+            <div class="eyebrow">
+                INFORMATION
+            </div>
+
+            <h2 style="margin-bottom:6px;">
+                Additional Information
+            </h2>
+
+            <span style="display:block; color:#64748b; font-size:14px;">
+                Public personnel information
+            </span>
+        </div>
+
+        <span style="padding:7px 11px; border:1px solid #dbe4ee; border-radius:999px; background:#f8fafc; color:#64748b; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;">
+            Profile Notes
+        </span>
+    </div>
+
+    <div class="notes-box" style="padding:20px 21px; border:1px solid #e2e8f0; border-radius:15px; background:linear-gradient(180deg,#f8fafc 0%,#f1f5f9 100%); color:#1e293b; line-height:1.8; white-space:pre-wrap; box-shadow:inset 0 1px 0 rgba(255,255,255,.8);">
+        {{ person.notes }}
+    </div>
+
+</section>
+
+{% endif %}
+
+{% endblock %}
+
+
+{% block content %}
+
+<a
+    href="{{ url_for('public_home') }}"
+    class="back"
+>
+    ← Back to Search
+</a>
+
+
+<!-- PROFILE HEADER -->
+<section class="profile-card">
+
+    <!-- PROFILE PICTURE -->
+
+    <div class="profile-picture-container">
+
+        <img
+            src="{{ url_for('profile_image', person_id=person.id) }}"
+            alt="{{ person.name }} profile picture"
+            class="profile-picture"
+            onerror="
+                this.style.display='none';
+                this.nextElementSibling.style.display='flex';
+            "
+        >
+
+        <div
+            class="profile-picture-placeholder"
+            style="display:none;"
+        >
+            {{ person.name[:1]|upper }}
+        </div>
+
+    </div>
+
+
+    <!-- BASIC INFORMATION -->
+
+    <div class="profile-main">
+
+        <div class="eyebrow">
+            PERSONNEL RECORD
+        </div>
+
+
+        <h1 class="profile-name">
+            {{ person.name }}
+        </h1>
+
+
+        <div class="profile-rank">
+            {{ person.rank }}
+        </div>
+
+
+        <!-- STATUS -->
+
+        <div class="profile-status">
+
+            {% if person.status == "Active" %}
+
+                <span class="status-badge status-active">
+                    🟢 Active
+                </span>
+
+            {% elif person.status == "LOA" %}
+
+                <span class="status-badge status-loa">
+                    🔴 LOA
+                </span>
+
+            {% elif person.status == "Suspended" %}
+
+                <span class="status-badge status-suspended">
+                    🟡 Suspended
+                </span>
+
+            {% elif person.status == "Retired" %}
+
+                <span class="status-badge status-retired">
+                    ⚫ Retired
+                </span>
+
+            {% elif person.status == "Training" %}
+
+                <span class="status-badge status-training">
+                    🔵 Training
+                </span>
+
+            {% else %}
+
+                <span class="status-badge">
+                    ⚪ {{ person.status }}
+                </span>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- POINTS -->
+
+    <div class="profile-points">
+
+        <span>
+            POINTS
+        </span>
+
+        <strong>
+            {{ person.points }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- PERSONNEL INFORMATION -->
+
+<section class="profile-information">
+
+    <div class="information-item">
+
+        <span class="information-label">
+            ROLE
+        </span>
+
+        <strong>
+            {{ person.role }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            DEPARTMENT
+        </span>
+
+        <strong>
+            {{ person.department }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            RANK
+        </span>
+
+        <strong>
+            {{ person.rank }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            STATUS
+        </span>
+
+        <strong>
+            {{ person.status }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- CRIMINAL RECORDS -->
+
+<section class="profile-section">
+
+    <div class="section-heading">
+
+        <div>
+            <div class="eyebrow">
+                RECORDS
+            </div>
+
+            <h2>
+                Criminal Records
+            </h2>
+        </div>
+
+    </div>
+
+
+    {% if criminal_records %}
+
+        <div class="criminal-records">
+
+            {% for record in criminal_records %}
+
+            <div class="criminal-record">
+
+                <div class="criminal-record-header">
+
+                    <div>
+
+                        {% if record.case_number %}
+
+                        <span class="case-number">
+                            Case #{{ record.case_number }}
+                        </span>
+
+                        {% else %}
+
+                        <span class="case-number">
+                            Criminal Record
+                        </span>
+
+                        {% endif %}
+
+                        <h3>
+                            {{ record.charge }}
+                        </h3>
+
+                    </div>
+
+
+                    <span
+                        class="
+                        record-status
+                        {% if record.record_status|lower == 'open' %}
+                        record-open
+                        {% elif record.record_status|lower == 'closed' %}
+                        record-closed
+                        {% else %}
+                        record-other
+                        {% endif %}
+                        "
+                    >
+
+                        {{ record.record_status }}
+
+                    </span>
+
+                </div>
+
+
+                {% if record.description %}
+
+                <p class="criminal-description">
+                    {{ record.description }}
+                </p>
+
+                {% endif %}
+
+
+                <div class="criminal-meta">
+
+                    {% if record.case_date %}
+
+                    <span>
+                        Date: {{ record.case_date }}
+                    </span>
+
+                    {% endif %}
+
+
+                    <span>
+                        Recorded by: {{ record.created_by }}
+                    </span>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records">
+
+            <div class="no-record-icon">
+                ✓
+            </div>
+
+            <div>
+
+                <strong>
+                    No Criminal Records
+                </strong>
+
+                <span>
+                    No criminal records are currently listed for this personnel.
+                </span>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- POINT HISTORY -->
+
+<section class="profile-section">
+
+    <div class="section-heading">
+        <div>
+            <div class="eyebrow">
+                POINTS
+            </div>
+
+            <h2>
+                Points History
+            </h2>
+        </div>
+    </div>
+
+    {% if point_logs %}
+
+        <div class="point-history">
+
+            {% for log in point_logs %}
+
+            <div class="point-history-item">
+
+                <div class="point-history-header">
+                    <strong class="point-history-amount {% if log.amount > 0 %}point-positive{% elif log.amount < 0 %}point-negative{% endif %}">
+                        {% if log.amount > 0 %}+{{ log.amount }}{% else %}{{ log.amount }}{% endif %} points
+                    </strong>
+
+                    <span class="point-history-date">
+                        {{ log.created_at }}
+                    </span>
+                </div>
+
+                <div class="point-history-reason">
+                    <strong>Reason:</strong>
+                    {{ log.reason }}
+                </div>
+
+                <div class="point-history-by">
+                    Added by: {{ log.changed_by }}
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records">
+            <div class="no-record-icon">
+                —
+            </div>
+
+            <div>
+                <strong>
+                    No Point History
+                </strong>
+
+                <span>
+                    No point changes have been recorded for this personnel.
+                </span>
+            </div>
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- ADDITIONAL INFORMATION -->
+
+{% if person.notes %}
+
+<section class="profile-section">
+
+    <div class="eyebrow">
+        INFORMATION
+    </div>
+
+    <h2>
+        Additional Information
+    </h2>
+
+    <div class="notes-box">
+
+        {{ person.notes }}
+
+    </div>
+
+</section>
+
+{% endif %}
+
+{% endblock %}

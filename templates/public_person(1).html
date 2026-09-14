@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ person.name }} · Philippine Pampanga Roleplay
+{% endblock %}
+
+
+{% block content %}
+
+<a
+    href="{{ url_for('public_home') }}"
+    class="back"
+>
+    ← Back to Search
+</a>
+
+
+<!-- PROFILE HEADER -->
+<section class="profile-card">
+
+    <!-- PROFILE PICTURE -->
+
+    <div class="profile-picture-container">
+
+        <img
+            src="{{ url_for('profile_image', person_id=person.id) }}"
+            alt="{{ person.name }} profile picture"
+            class="profile-picture"
+            onerror="
+                this.style.display='none';
+                this.nextElementSibling.style.display='flex';
+            "
+        >
+
+        <div
+            class="profile-picture-placeholder"
+            style="display:none;"
+        >
+            {{ person.name[:1]|upper }}
+        </div>
+
+    </div>
+
+
+    <!-- BASIC INFORMATION -->
+
+    <div class="profile-main">
+
+        <div class="eyebrow">
+            PERSONNEL RECORD
+        </div>
+
+
+        <h1 class="profile-name">
+            {{ person.name }}
+        </h1>
+
+
+        <div class="profile-rank">
+            {{ person.rank }}
+        </div>
+
+
+        <!-- STATUS -->
+
+        <div class="profile-status">
+
+            {% if person.status == "Active" %}
+
+                <span class="status-badge status-active">
+                    🟢 Active
+                </span>
+
+            {% elif person.status == "LOA" %}
+
+                <span class="status-badge status-loa">
+                    🔴 LOA
+                </span>
+
+            {% elif person.status == "Suspended" %}
+
+                <span class="status-badge status-suspended">
+                    🟡 Suspended
+                </span>
+
+            {% elif person.status == "Retired" %}
+
+                <span class="status-badge status-retired">
+                    ⚫ Retired
+                </span>
+
+            {% elif person.status == "Training" %}
+
+                <span class="status-badge status-training">
+                    🔵 Training
+                </span>
+
+            {% else %}
+
+                <span class="status-badge">
+                    ⚪ {{ person.status }}
+                </span>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- POINTS -->
+
+    <div class="profile-points">
+
+        <span>
+            POINTS
+        </span>
+
+        <strong>
+            {{ person.points }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- PERSONNEL INFORMATION -->
+
+<section class="profile-information">
+
+    <div class="information-item">
+
+        <span class="information-label">
+            ROLE
+        </span>
+
+        <strong>
+            {{ person.role }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            DEPARTMENT
+        </span>
+
+        <strong>
+            {{ person.department }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            RANK
+        </span>
+
+        <strong>
+            {{ person.rank }}
+        </strong>
+
+    </div>
+
+
+    <div class="information-item">
+
+        <span class="information-label">
+            STATUS
+        </span>
+
+        <strong>
+            {{ person.status }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+
+<!-- CRIMINAL RECORDS -->
+
+<section class="profile-section">
+
+    <div class="section-heading">
+
+        <div>
+            <div class="eyebrow">
+                RECORDS
+            </div>
+
+            <h2>
+                Criminal Records
+            </h2>
+        </div>
+
+    </div>
+
+
+    {% if criminal_records %}
+
+        <div class="criminal-records">
+
+            {% for record in criminal_records %}
+
+            <div class="criminal-record">
+
+                <div class="criminal-record-header">
+
+                    <div>
+
+                        {% if record.case_number %}
+
+                        <span class="case-number">
+                            Case #{{ record.case_number }}
+                        </span>
+
+                        {% else %}
+
+                        <span class="case-number">
+                            Criminal Record
+                        </span>
+
+                        {% endif %}
+
+                        <h3>
+                            {{ record.charge }}
+                        </h3>
+
+                    </div>
+
+
+                    <span
+                        class="
+                        record-status
+                        {% if record.record_status|lower == 'open' %}
+                        record-open
+                        {% elif record.record_status|lower == 'closed' %}
+                        record-closed
+                        {% else %}
+                        record-other
+                        {% endif %}
+                        "
+                    >
+
+                        {{ record.record_status }}
+
+                    </span>
+
+                </div>
+
+
+                {% if record.description %}
+
+                <p class="criminal-description">
+                    {{ record.description }}
+                </p>
+
+                {% endif %}
+
+
+                <div class="criminal-meta">
+
+                    {% if record.case_date %}
+
+                    <span>
+                        Date: {{ record.case_date }}
+                    </span>
+
+                    {% endif %}
+
+
+                    <span>
+                        Recorded by: {{ record.created_by }}
+                    </span>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records">
+
+            <div class="no-record-icon">
+                ✓
+            </div>
+
+            <div>
+
+                <strong>
+                    No Criminal Records
+                </strong>
+
+                <span>
+                    No criminal records are currently listed for this personnel.
+                </span>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- POINT HISTORY -->
+
+<section class="profile-section">
+
+    <div class="section-heading">
+        <div>
+            <div class="eyebrow">
+                POINTS
+            </div>
+
+            <h2>
+                Points History
+            </h2>
+        </div>
+    </div>
+
+    {% if point_logs %}
+
+        <div class="point-history">
+
+            {% for log in point_logs %}
+
+            <div class="point-history-item">
+
+                <div class="point-history-header">
+                    <strong class="point-history-amount {% if log.amount > 0 %}point-positive{% elif log.amount < 0 %}point-negative{% endif %}">
+                        {% if log.amount > 0 %}+{{ log.amount }}{% else %}{{ log.amount }}{% endif %} points
+                    </strong>
+
+                    <span class="point-history-date">
+                        {{ log.created_at }}
+                    </span>
+                </div>
+
+                <div class="point-history-reason">
+                    <strong>Reason:</strong>
+                    {{ log.reason }}
+                </div>
+
+                <div class="point-history-by">
+                    Added by: {{ log.changed_by }}
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="no-records">
+            <div class="no-record-icon">
+                —
+            </div>
+
+            <div>
+                <strong>
+                    No Point History
+                </strong>
+
+                <span>
+                    No point changes have been recorded for this personnel.
+                </span>
+            </div>
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+
+<!-- ADDITIONAL INFORMATION -->
+
+{% if person.notes %}
+
+<section class="profile-section">
+
+    <div class="eyebrow">
+        INFORMATION
+    </div>
+
+    <h2>
+        Additional Information
+    </h2>
+
+    <div class="notes-box">
+
+        {{ person.notes }}
+
+    </div>
+
+</section>
+
+{% endif %}
+
+{% endblock %}
